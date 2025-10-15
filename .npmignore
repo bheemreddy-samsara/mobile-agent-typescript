@@ -1,0 +1,40 @@
+# Source files (only include built dist/)
+src/
+test/
+examples/
+
+# Config files
+tsconfig.json
+jest.config.js
+.eslintrc.js
+
+# Documentation (keep README)
+CONTRIBUTING.md
+
+# Development files
+.git/
+.github/
+.vscode/
+.idea/
+
+# Test and coverage
+coverage/
+*.test.ts
+*.spec.ts
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.tmp
+*.swp
+
