@@ -12,6 +12,7 @@ A TypeScript SDK that brings natural language testing capabilities to your exist
 - **Type-Safe**: Full TypeScript support with comprehensive type definitions
 - **Four-Tier Hybrid System**: Intelligent fallback from hierarchy → vision tagging → grid overlay → pure vision
 - **Vision Fallback**: Multimodal LLM support when hierarchy fails (with DPI-aware scaling)
+- **MCP Server Support**: Run as Model Context Protocol server for agent-based workflows
 - **Zero Configuration**: Minimal setup required
 
 ## 📦 Installation
@@ -96,6 +97,54 @@ describe('My App Tests', () => {
   });
 });
 ```
+
+## 🤖 MCP Server (Agent Mode)
+
+Run Mobile Agent as a **Model Context Protocol (MCP) server** to enable agent-based workflows with Claude Desktop, Cursor, Cline, and other MCP clients:
+
+```bash
+# Using npx
+npx @mobile-agent/sdk mobile-agent-mcp
+
+# Or using npm script
+npm run mcp-server
+```
+
+### MCP Client Configuration
+
+**Claude Desktop** (`claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "mobile-agent": {
+      "command": "npx",
+      "args": ["-y", "@mobile-agent/sdk", "mobile-agent-mcp"],
+      "env": {
+        "OPENAI_API_KEY": "sk-...",
+        "MOBILE_PLATFORM": "Android"
+      }
+    }
+  }
+}
+```
+
+**Cursor / Cline / Goose**: See [MCP_GUIDE.md](./MCP_GUIDE.md) for detailed setup instructions.
+
+### Agent Workflows
+
+With MCP enabled, you can instruct your agent to:
+
+```
+1. Start a mobile testing session
+2. Navigate to settings and enable dark mode
+3. Take a screenshot
+4. Verify dark mode is enabled
+5. Stop the session with success
+```
+
+The agent will automatically use Mobile Agent's four-tier vision system to execute these commands!
+
+**Learn more:** [MCP Server Guide](./MCP_GUIDE.md) | [Comparison with mobile-mcp](./MCP_GUIDE.md#-comparison-with-mobile-mcp)
 
 ## 📖 API Reference
 
