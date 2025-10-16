@@ -23,44 +23,64 @@ npm install @mobile-agent/sdk
 
 ## 🚀 Quick Start
 
-### Basic Usage
+### Prerequisites
+
+- ✅ Node.js 18+ installed
+- ✅ Appium server running (`appium --port 4723`)
+- ✅ Android device/emulator or iOS simulator
+- ✅ OpenAI or Anthropic API key
+
+### 5-Minute Setup
+
+**Step 1: Set your API key**
+```bash
+export OPENAI_API_KEY="sk-..."  # or ANTHROPIC_API_KEY
+```
+
+**Step 2: Start Appium**
+```bash
+appium --port 4723
+```
+
+**Step 3: Write your first test**
 
 ```typescript
 import { remote } from 'webdriverio';
 import { MobileAgent } from '@mobile-agent/sdk';
 
-// Initialize WebDriverIO
-const driver = await remote({
-  hostname: 'localhost',
-  port: 4723,
-  capabilities: {
-    platformName: 'Android',
-    'appium:automationName': 'UiAutomator2',
-    'appium:appPackage': 'com.example.app',
-  },
-});
+async function firstTest() {
+  // 1. Connect to Appium
+  const driver = await remote({
+    hostname: 'localhost',
+    port: 4723,
+    capabilities: {
+      platformName: 'Android',
+      'appium:automationName': 'UiAutomator2',
+      'appium:appPackage': 'com.android.settings',
+    },
+  });
 
-// Create Mobile Agent
-const agent = new MobileAgent({
-  driver,
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+  // 2. Create agent
+  const agent = new MobileAgent({
+    driver,
+    apiKey: process.env.OPENAI_API_KEY!,
+  });
 
-// Start session
-await agent.startSession();
+  // 3. Start session and execute commands
+  await agent.startSession();
+  await agent.execute('tap on Network & internet');
+  const passed = await agent.assert('network settings page is open');
+  await agent.stopSession(passed ? 'success' : 'failure');
+  
+  await driver.deleteSession();
+}
 
-// Execute natural language commands
-await agent.execute('tap on the settings icon');
-await agent.execute('scroll down to privacy settings');
-await agent.execute('enable location services');
+firstTest().catch(console.error);
+```
 
-// Verify results
-const passed = await agent.assert('location services are enabled');
-
-// Stop session
-const result = await agent.stopSession(passed ? 'success' : 'failure');
-
-await driver.deleteSession();
+**Step 4: Run it**
+```bash
+npx ts-node test.ts
 ```
 
 ### Integration with Existing Tests
@@ -98,53 +118,33 @@ describe('My App Tests', () => {
 });
 ```
 
-## 🤖 MCP Server (Agent Mode)
+## 🤖 Agent Mode (MCP Server)
 
-Run Mobile Agent as a **Model Context Protocol (MCP) server** to enable agent-based workflows with Claude Desktop, Cursor, Cline, and other MCP clients:
+Run Mobile Agent as an **MCP server** to enable AI agents (Claude, Cursor, Cline) to control mobile devices:
 
 ```bash
-# Using npx
+# Set API key and run
+export OPENAI_API_KEY="sk-..."
 npx @mobile-agent/sdk mobile-agent-mcp
-
-# Or using npm script
-npm run mcp-server
 ```
 
-### MCP Client Configuration
-
-**Claude Desktop** (`claude_desktop_config.json`):
-```json
-{
-  "mcpServers": {
-    "mobile-agent": {
-      "command": "npx",
-      "args": ["-y", "@mobile-agent/sdk", "mobile-agent-mcp"],
-      "env": {
-        "OPENAI_API_KEY": "sk-...",
-        "MOBILE_PLATFORM": "Android"
-      }
-    }
-  }
-}
+**Example agent workflow:**
+```
+Start a mobile testing session
+Navigate to settings and enable dark mode
+Take a screenshot
+Verify dark mode is enabled
+Stop the session with success
 ```
 
-**Cursor / Cline / Goose**: See [MCP_GUIDE.md](./MCP_GUIDE.md) for detailed setup instructions.
+The agent will use our four-tier vision system to execute commands automatically!
 
-### Agent Workflows
-
-With MCP enabled, you can instruct your agent to:
-
-```
-1. Start a mobile testing session
-2. Navigate to settings and enable dark mode
-3. Take a screenshot
-4. Verify dark mode is enabled
-5. Stop the session with success
-```
-
-The agent will automatically use Mobile Agent's four-tier vision system to execute these commands!
-
-**Learn more:** [MCP Server Guide](./MCP_GUIDE.md) | [Comparison with mobile-mcp](./MCP_GUIDE.md#-comparison-with-mobile-mcp)
+**Setup & Configuration:** See **[AGENTS.md](./AGENTS.md)** for complete guide including:
+- Claude Desktop, Cursor, Cline setup
+- 7 available MCP tools
+- Example workflows
+- Comparison with mobile-mcp (2.2k ⭐)
+- Troubleshooting guide
 
 ## 📖 API Reference
 
