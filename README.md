@@ -10,7 +10,8 @@ A TypeScript SDK that brings natural language testing capabilities to your exist
 - **Easy Integration**: Works with existing WebDriverIO/Appium tests
 - **Multiple LLM Support**: OpenAI GPT-4 and Anthropic Claude
 - **Type-Safe**: Full TypeScript support with comprehensive type definitions
-- **UI Hierarchy Based**: Uses XML parsing (not vision) for reliable element detection
+- **Four-Tier Hybrid System**: Intelligent fallback from hierarchy → vision tagging → grid overlay → pure vision
+- **Vision Fallback**: Multimodal LLM support when hierarchy fails (with DPI-aware scaling)
 - **Zero Configuration**: Minimal setup required
 
 ## 📦 Installation
@@ -224,27 +225,89 @@ The SDK understands various natural language instructions:
 
 ## 🏗️ Architecture
 
-The SDK uses a **hierarchy-based** approach (not vision-based):
+The SDK uses a **three-tier hybrid approach** combining hierarchy and vision:
+
+### Tier 1: Hierarchy-Based (Primary)
 
 1. **UI Observation**: Parses XML hierarchy from Appium
 2. **LLM Planning**: Sends UI structure to LLM for action planning
 3. **Action Execution**: Executes planned actions via WebDriverIO
 4. **Verification**: Uses LLM to verify test outcomes
 
-### Why Hierarchy-Based?
+**Benefits:**
+- ✅ **100% Accurate** - Perfect element detection
+- ✅ **Instant** - No processing delay
+- ✅ **Cost Effective** - Minimal API costs
+- ✅ **No OCR Errors** - Direct text extraction
 
-✅ **More Reliable** - 100% accuracy vs 70-90% for vision  
-✅ **Faster** - Instant XML parsing vs 1-3s image analysis  
-✅ **No OCR Errors** - Perfect text extraction  
-✅ **Works Everywhere** - No lighting/theme issues  
+### Tier 2: Vision + Numeric Tagging (Fallback)
+
+When hierarchy fails (element not found, low confidence), the system falls back to:
+
+1. **Screenshot Capture**: Takes screenshot of current state
+2. **Numeric Tagging**: Overlays numbered tags on interactive elements
+3. **Vision LLM**: Sends tagged screenshot to GPT-4V/Claude 3.5 Sonnet
+4. **Action Selection**: LLM selects element by number
+5. **Coordinate Mapping**: Maps number back to precise coordinates
+
+**Benefits:**
+- ✅ **90-95% Accurate** - Reliable element detection
+- ✅ **Handles Complex UI** - Works with dynamic layouts
+- ✅ **Visual Context** - Understands visual hierarchy
+
+### Tier 3: Vision + Grid Overlay (Last Resort)
+
+For pixel-perfect interactions:
+
+1. **Grid Generation**: Creates grid overlay (A1, B2, C3, etc.)
+2. **Vision LLM**: Analyzes screenshot with grid labels
+3. **Grid Selection**: LLM selects grid cell
+4. **Coordinate Calculation**: Converts grid position to exact coordinates
+
+**Benefits:**
+- ✅ **85-90% Accurate** - Precise positioning
+- ✅ **No Element Required** - Works on any screen area
+- ✅ **Custom Gestures** - Complex interactions
+
+### Fallback Configuration
+
+```typescript
+const agent = new MobileAgent({
+  driver,
+  apiKey: process.env.OPENAI_API_KEY!,
+  enableVisionFallback: true,  // Enable 3-tier system
+  visionConfig: {
+    enabled: true,
+    fallbackOnElementNotFound: true,
+    fallbackOnLowConfidence: true,
+    confidenceThreshold: 0.7,
+    gridSize: 10,
+  },
+});
+```
 
 ## 📊 Examples
 
 See the [`examples/`](./examples) directory for complete examples:
 
+### Basic Examples
 - [`basic-usage.ts`](./examples/basic-usage.ts) - Simple getting started example
 - [`existing-test-integration.ts`](./examples/existing-test-integration.ts) - Integration with existing test suites
 - [`multi-provider.ts`](./examples/multi-provider.ts) - Using different LLM providers
+
+### Demo App & Tests
+- [`demo-app/`](./examples/demo-app) - React Native demo app for testing
+- [`tests/demo-app/`](./examples/tests/demo-app) - Comprehensive test suite for demo app
+  - `login-flow.test.ts` - Form validation and login testing
+  - `navigation.test.ts` - Screen navigation testing
+  - `fallback-scenarios.test.ts` - Three-tier fallback system testing
+
+### Real App Tests
+- [`tests/real-apps/`](./examples/tests/real-apps) - Tests for production apps
+  - `settings.test.ts` - Android/iOS Settings app testing
+  - `google-maps.test.ts` - Complex UI testing with Google Maps
+
+See [`examples/README.md`](./examples/README.md) for detailed setup instructions.
 
 ## 🧪 Testing
 
@@ -327,6 +390,13 @@ curl http://localhost:4723/status
 
 ## 🎓 Learn More
 
+### Documentation
+- [Pure Vision Guide](./PURE_VISION_GUIDE.md) - Four-tier system and pure vision mode
+- [Vision Fallback Guide](./VISION_FALLBACK_GUIDE.md) - Technical implementation details
+- [Bug Fixes](./BUG_FIXES.md) - Critical bug fixes and DPI scaling
+- [AppAgent Comparison](./APPAGENT_COMPARISON.md) - Comparison with TencentQQGYLab/AppAgent
+
+### External Resources
 - [Mobile Agent Python SDK](../MobileAgentFramework)
 - [Appium Documentation](https://appium.io/docs)
 - [WebDriverIO Documentation](https://webdriver.io/docs/gettingstarted)

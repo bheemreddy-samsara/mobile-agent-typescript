@@ -16,6 +16,8 @@ import {
   VerificationStatus,
   UIState,
   UIElement,
+  VisionMethod,
+  VisionFallbackConfig,
 } from './types';
 import { logger, LogLevel } from './utils/logger';
 
@@ -24,11 +26,22 @@ export class MobileAgent {
   private llm: LLMProvider;
   private observer: UIObserver;
   private config: Required<MobileAgentConfig>;
+  private visionConfig: VisionFallbackConfig;
   private testResult?: TestResult;
   private actionHistory: string[] = [];
   private currentState?: UIState;
 
   constructor(config: MobileAgentConfig) {
+    const defaultVisionConfig: VisionFallbackConfig = {
+      enabled: config.enableVisionFallback !== undefined ? config.enableVisionFallback : true,
+      fallbackOnElementNotFound: true,
+      fallbackOnLowConfidence: true,
+      confidenceThreshold: 0.7,
+      gridSize: 10,
+      alwaysUseVision: false,
+      preferredMethod: VisionMethod.HIERARCHY,
+    };
+
     this.config = {
       driver: config.driver,
       apiKey: config.apiKey,
@@ -37,6 +50,30 @@ export class MobileAgent {
       maxSteps: config.maxSteps || 20,
       timeoutSeconds: config.timeoutSeconds || 300,
       verbose: config.verbose !== undefined ? config.verbose : false,
+      enableVisionFallback: config.enableVisionFallback !== undefined ? config.enableVisionFallback : true,
+      visionConfig: { ...defaultVisionConfig, ...config.visionConfig },
+    };
+
+    // Set up vision fallback configuration
+    // Honor visionConfig.enabled if explicitly provided, otherwise use enableVisionFallback
+    const visionEnabled = config.visionConfig?.enabled !== undefined 
+      ? config.visionConfig.enabled 
+      : this.config.enableVisionFallback;
+
+    this.visionConfig = {
+      enabled: visionEnabled,
+      fallbackOnElementNotFound: config.visionConfig?.fallbackOnElementNotFound !== undefined ? config.visionConfig.fallbackOnElementNotFound : true,
+      fallbackOnLowConfidence: config.visionConfig?.fallbackOnLowConfidence !== undefined ? config.visionConfig.fallbackOnLowConfidence : true,
+      confidenceThreshold: config.visionConfig?.confidenceThreshold || 0.7,
+      gridSize: config.visionConfig?.gridSize || 10,
+      alwaysUseVision: config.visionConfig?.alwaysUseVision || false,
+      preferredMethod: config.visionConfig?.preferredMethod || VisionMethod.HIERARCHY,
+      pureVisionOnly: config.visionConfig?.pureVisionOnly || false,
+      pureVisionConfig: {
+        enabled: config.visionConfig?.pureVisionConfig?.enabled !== undefined ? config.visionConfig.pureVisionConfig.enabled : true,
+        minimumConfidence: config.visionConfig?.pureVisionConfig?.minimumConfidence || 0.5,
+        usePercentageCoordinates: config.visionConfig?.pureVisionConfig?.usePercentageCoordinates !== undefined ? config.visionConfig.pureVisionConfig.usePercentageCoordinates : true,
+      },
     };
 
     this.driver = config.driver;
@@ -92,40 +129,122 @@ export class MobileAgent {
     logger.info(`Executing: ${instruction}`);
     this.testResult.task = instruction;
 
+    let actionResponse: any;
+    let targetElement: UIElement | undefined;
+    let usedMethod: VisionMethod = VisionMethod.HIERARCHY;
+
     try {
-      // Get current UI state
-      this.currentState = await this.observer.getUIState(this.driver);
+      // Check if pure vision only mode is enabled
+      if (this.visionConfig.pureVisionOnly) {
+        logger.info('Pure vision only mode enabled, skipping hierarchy/tagging/grid');
+        actionResponse = await this.tryPureVisionApproach(instruction);
+        usedMethod = VisionMethod.PURE_VISION;
+        
+        // Re-resolve target element (though pure vision typically uses coordinates)
+        if (actionResponse.elementId) {
+          targetElement = this.currentState!.elements.find(
+            (e) => e.elementId === actionResponse.elementId
+          );
+        } else {
+          targetElement = undefined; // Pure vision uses coordinates, not element IDs
+        }
+        
+        logger.info('✓ Pure vision approach succeeded');
+      } else {
+        // Standard four-tier cascading fallback
+        // Try Tier 1: Hierarchy-based approach
+        actionResponse = await this.tryHierarchyApproach(instruction);
+        usedMethod = VisionMethod.HIERARCHY;
+        
+        // Find target element
+        if (actionResponse.elementId) {
+          targetElement = this.currentState!.elements.find(
+            (e) => e.elementId === actionResponse.elementId
+          );
+        }
 
-      // Query LLM for action
-      const actionResponse = await this.llm.generateAction(
-        this.currentState,
-        instruction,
-        this.actionHistory
-      );
-
-      logger.debug(`LLM suggested action: ${JSON.stringify(actionResponse)}`);
-
-      // Find target element
-      const targetElement = this.currentState.elements.find(
-        (e) => e.elementId === actionResponse.elementId
-      );
-
-      if (!targetElement && actionResponse.elementId) {
-        throw new Error(`Element not found: ${actionResponse.elementId}`);
+        // Check if we need to fallback to vision
+        const shouldFallback = this.shouldFallbackToVision(actionResponse, targetElement);
+        
+        if (shouldFallback && this.visionConfig.enabled) {
+          logger.warn('Hierarchy approach insufficient, falling back to vision methods');
+          
+          // Try Tier 2: Vision with numeric tagging
+          try {
+            actionResponse = await this.tryVisionTaggingApproach(instruction);
+            usedMethod = VisionMethod.VISION_TAGGING;
+            
+            // Re-resolve target element after successful fallback
+            if (actionResponse.elementId) {
+              targetElement = this.currentState!.elements.find(
+                (e) => e.elementId === actionResponse.elementId
+              );
+            } else {
+              targetElement = undefined; // Vision methods use coordinates, not element IDs
+            }
+            
+            logger.info('✓ Vision tagging approach succeeded');
+          } catch (error: any) {
+            logger.warn(`Vision tagging failed: ${error.message}, trying grid overlay`);
+            
+            // Try Tier 3: Grid overlay
+            try {
+              actionResponse = await this.tryGridOverlayApproach(instruction);
+              usedMethod = VisionMethod.GRID_OVERLAY;
+              
+              // Re-resolve target element after successful fallback
+              if (actionResponse.elementId) {
+                targetElement = this.currentState!.elements.find(
+                  (e) => e.elementId === actionResponse.elementId
+                );
+              } else {
+                targetElement = undefined; // Grid uses coordinates, not element IDs
+              }
+              
+              logger.info('✓ Grid overlay approach succeeded');
+            } catch (gridError: any) {
+              logger.warn(`Grid overlay failed: ${gridError.message}, trying pure vision`);
+              
+              // Try Tier 4: Pure vision (last resort)
+              if (this.visionConfig.pureVisionConfig?.enabled) {
+                actionResponse = await this.tryPureVisionApproach(instruction);
+                usedMethod = VisionMethod.PURE_VISION;
+                
+                // Re-resolve target element after successful fallback
+                if (actionResponse.elementId) {
+                  targetElement = this.currentState!.elements.find(
+                    (e) => e.elementId === actionResponse.elementId
+                  );
+                } else {
+                  targetElement = undefined; // Pure vision uses coordinates, not element IDs
+                }
+                
+                logger.info('✓ Pure vision approach succeeded (Tier 4)');
+              } else {
+                throw gridError; // Rethrow grid error if pure vision disabled
+              }
+            }
+          }
+        }
       }
+
+      logger.debug(`Action determined using ${usedMethod}: ${JSON.stringify(actionResponse)}`);
 
       // Execute the action
       const step = await this.executeAction(
         actionResponse.action as ActionType,
         targetElement,
-        actionResponse.parameters || {}
+        {
+          ...actionResponse.parameters || {},
+          coordinates: actionResponse.coordinates,
+        }
       );
 
-      step.description = actionResponse.reasoning;
+      step.description = `[${usedMethod}] ${actionResponse.reasoning}`;
       this.testResult.steps.push(step);
-      this.actionHistory.push(`${actionResponse.action} on ${targetElement?.text || 'element'}`);
+      this.actionHistory.push(`${actionResponse.action} - ${actionResponse.reasoning}`);
 
-      logger.info(`Action executed: ${actionResponse.reasoning}`);
+      logger.info(`✓ Action executed successfully using ${usedMethod}`);
     } catch (error: any) {
       logger.error('Execution failed:', error);
       const failedStep: ActionStep = {
@@ -139,6 +258,118 @@ export class MobileAgent {
       this.testResult.steps.push(failedStep);
       throw error;
     }
+  }
+
+  /**
+   * Try hierarchy-based approach (Tier 1)
+   */
+  private async tryHierarchyApproach(instruction: string) {
+    this.currentState = await this.observer.getUIState(this.driver, 'none');
+    const actionResponse = await this.llm.generateAction(
+      this.currentState,
+      instruction,
+      this.actionHistory
+    );
+    actionResponse.method = VisionMethod.HIERARCHY;
+    return actionResponse;
+  }
+
+  /**
+   * Try vision with numeric tagging (Tier 2)
+   */
+  private async tryVisionTaggingApproach(instruction: string) {
+    this.currentState = await this.observer.getUIState(this.driver, 'tagged');
+    const actionResponse = await this.llm.generateActionWithVisionTagging(
+      this.currentState,
+      instruction,
+      this.actionHistory
+    );
+    return actionResponse;
+  }
+
+  /**
+   * Try grid overlay approach (Tier 3)
+   */
+  private async tryGridOverlayApproach(instruction: string) {
+    this.currentState = await this.observer.getUIState(
+      this.driver,
+      'grid',
+      this.visionConfig.gridSize
+    );
+    const actionResponse = await this.llm.generateActionWithGridOverlay(
+      this.currentState,
+      instruction,
+      this.actionHistory
+    );
+    return actionResponse;
+  }
+
+  private async tryPureVisionApproach(instruction: string) {
+    // Update current state (for consistency with other tiers, even though pure vision doesn't use hierarchy)
+    this.currentState = await this.observer.getUIState(this.driver, 'screenshot');
+    
+    // Capture raw screenshot without overlays
+    const screenshotBase64 = this.currentState.screenshotBase64 || 
+      await this.observer.captureScreenshotAsBase64(this.driver);
+    const windowSize = await this.driver.getWindowSize();
+
+    // Check minimum confidence requirement
+    const minConfidence = this.visionConfig.pureVisionConfig?.minimumConfidence || 0.5;
+    
+    const actionResponse = await this.llm.generateActionWithPureVision(
+      screenshotBase64,
+      instruction,
+      windowSize,
+      this.actionHistory
+    );
+
+    // Validate confidence
+    if (actionResponse.confidence && actionResponse.confidence < minConfidence) {
+      throw new Error(
+        `Pure vision confidence too low: ${actionResponse.confidence} < ${minConfidence}`
+      );
+    }
+
+    logger.debug(
+      `Pure vision located element "${actionResponse.element}" at ` +
+      `${actionResponse.location?.x_percent}%, ${actionResponse.location?.y_percent}% ` +
+      `(${actionResponse.coordinates?.x}, ${actionResponse.coordinates?.y})`
+    );
+
+    return actionResponse;
+  }
+
+  /**
+   * Determine if we should fallback to vision-based approach
+   */
+  private shouldFallbackToVision(actionResponse: any, targetElement?: UIElement): boolean {
+    if (this.visionConfig.alwaysUseVision) {
+      return true;
+    }
+
+    // Fallback if element not found
+    if (this.visionConfig.fallbackOnElementNotFound && actionResponse.elementId && !targetElement) {
+      logger.debug('Fallback triggered: Element not found');
+      return true;
+    }
+
+    // Fallback if confidence is too low
+    if (this.visionConfig.fallbackOnLowConfidence && 
+        actionResponse.confidence !== undefined &&
+        this.visionConfig.confidenceThreshold !== undefined) {
+      if (actionResponse.confidence < this.visionConfig.confidenceThreshold) {
+        logger.debug(`Fallback triggered: Low confidence (${actionResponse.confidence})`);
+        return true;
+      }
+    }
+
+    // Fallback if action is error
+    if (actionResponse.action === 'error') {
+      logger.debug('Fallback triggered: Error action');
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -250,11 +481,11 @@ export class MobileAgent {
       switch (actionType) {
         case ActionType.CLICK:
         case ActionType.TAP:
-          await this.clickElement(targetElement);
+          await this.clickElement(targetElement, parameters.coordinates);
           break;
 
         case ActionType.TYPE_TEXT:
-          await this.typeText(targetElement, parameters.text || '');
+          await this.typeText(targetElement, parameters.text || '', parameters.coordinates);
           break;
 
         case ActionType.SWIPE:
@@ -269,7 +500,7 @@ export class MobileAgent {
           break;
 
         case ActionType.LONG_PRESS:
-          await this.longPress(targetElement);
+          await this.longPress(targetElement, parameters.coordinates);
           break;
 
         default:
@@ -287,23 +518,32 @@ export class MobileAgent {
   }
 
   /**
-   * Click on an element
+   * Click on an element or coordinates
    */
-  private async clickElement(element?: UIElement): Promise<void> {
-    if (!element) {
-      throw new Error('No element to click');
+  private async clickElement(
+    element?: UIElement,
+    coordinates?: { x: number; y: number }
+  ): Promise<void> {
+    let targetCoords = coordinates;
+
+    // If no coordinates provided, get from element
+    if (!targetCoords) {
+      if (!element) {
+        throw new Error('No element or coordinates to click');
+      }
+
+      const center = this.observer.getElementCenter(element);
+      if (!center) {
+        throw new Error('Element has no bounds');
+      }
+      targetCoords = center;
     }
 
-    const center = this.observer.getElementCenter(element);
-    if (!center) {
-      throw new Error('Element has no bounds');
-    }
-
-    logger.debug(`Clicking at (${center.x}, ${center.y})`);
+    logger.debug(`Clicking at (${targetCoords.x}, ${targetCoords.y})`);
     await this.driver.touchAction({
       action: 'tap',
-      x: center.x,
-      y: center.y,
+      x: targetCoords.x,
+      y: targetCoords.y,
     });
 
     // Wait a bit for UI to settle
@@ -313,13 +553,13 @@ export class MobileAgent {
   /**
    * Type text into an element
    */
-  private async typeText(element?: UIElement, text: string = ''): Promise<void> {
-    if (!element) {
-      throw new Error('No element to type into');
-    }
-
-    // Click to focus
-    await this.clickElement(element);
+  private async typeText(
+    element?: UIElement,
+    text: string = '',
+    coordinates?: { x: number; y: number }
+  ): Promise<void> {
+    // Click to focus (using either element or coordinates)
+    await this.clickElement(element, coordinates);
 
     // Type text
     logger.debug(`Typing text: ${text}`);
@@ -381,21 +621,30 @@ export class MobileAgent {
   }
 
   /**
-   * Long press on an element
+   * Long press on an element or coordinates
    */
-  private async longPress(element?: UIElement): Promise<void> {
-    if (!element) {
-      throw new Error('No element to long press');
+  private async longPress(
+    element?: UIElement,
+    coordinates?: { x: number; y: number }
+  ): Promise<void> {
+    let targetCoords = coordinates;
+
+    // If no coordinates provided, get from element
+    if (!targetCoords) {
+      if (!element) {
+        throw new Error('No element or coordinates to long press');
+      }
+
+      const center = this.observer.getElementCenter(element);
+      if (!center) {
+        throw new Error('Element has no bounds');
+      }
+      targetCoords = center;
     }
 
-    const center = this.observer.getElementCenter(element);
-    if (!center) {
-      throw new Error('Element has no bounds');
-    }
-
-    logger.debug(`Long pressing at (${center.x}, ${center.y})`);
+    logger.debug(`Long pressing at (${targetCoords.x}, ${targetCoords.y})`);
     await this.driver.touchAction([
-      { action: 'press', x: center.x, y: center.y },
+      { action: 'press', x: targetCoords.x, y: targetCoords.y },
       { action: 'wait', ms: 1000 },
       { action: 'release' },
     ]);

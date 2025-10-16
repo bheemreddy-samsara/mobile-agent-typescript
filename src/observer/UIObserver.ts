@@ -6,12 +6,17 @@ import { parseString } from 'xml2js';
 import type { Browser } from 'webdriverio';
 import { UIElement, UIState, UIElementType } from '../types';
 import { logger } from '../utils/logger';
+import { overlayNumericTags, overlayGridLines } from '../utils/imageProcessor';
 
 export class UIObserver {
   /**
    * Get the current UI state from the driver
    */
-  async getUIState(driver: Browser): Promise<UIState> {
+  async getUIState(
+    driver: Browser,
+    captureMode: 'none' | 'screenshot' | 'tagged' | 'grid' = 'none',
+    gridSize: number = 10
+  ): Promise<UIState> {
     try {
       const pageSource = await driver.getPageSource();
       const activity = await this.getCurrentActivity(driver);
@@ -27,10 +32,93 @@ export class UIObserver {
         deviceInfo,
       };
 
+      // Capture screenshot based on mode
+      if (captureMode !== 'none') {
+        const screenshotBase64 = await this.captureScreenshotAsBase64(driver);
+        state.screenshotBase64 = screenshotBase64;
+
+        if (captureMode === 'tagged') {
+          const { image, mapping } = await overlayNumericTags(screenshotBase64, elements);
+          state.screenshotBase64 = image;
+          state.tagMapping = mapping;
+          logger.debug(`Tagged screenshot with ${mapping.size} elements`);
+        } else if (captureMode === 'grid') {
+          const windowSize = await driver.getWindowSize();
+          const { image, gridMap, scaleFactor } = await overlayGridLines(
+            screenshotBase64,
+            gridSize,
+            windowSize.width,
+            windowSize.height
+          );
+          state.screenshotBase64 = image;
+          state.gridMap = gridMap;  // Already scaled to logical coordinates
+          logger.debug(`Created grid overlay with ${gridMap.size} cells (scale: ${scaleFactor.x.toFixed(2)}x${scaleFactor.y.toFixed(2)})`);
+        }
+      }
+
       logger.debug(`Current state: ${activity}, ${elements.length} elements`);
       return state;
     } catch (error) {
       logger.error('Failed to get UI state:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Capture screenshot as base64 string
+   */
+  async captureScreenshotAsBase64(driver: Browser): Promise<string> {
+    try {
+      const screenshot = await driver.takeScreenshot();
+      return screenshot;
+    } catch (error) {
+      logger.error('Failed to capture screenshot:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Capture screenshot with numeric tags overlaid on interactive elements
+   */
+  async captureScreenshotWithTags(
+    driver: Browser,
+    elements: UIElement[]
+  ): Promise<{ screenshot: string; tagMapping: Map<number, UIElement> }> {
+    try {
+      const screenshotBase64 = await this.captureScreenshotAsBase64(driver);
+      const result = await overlayNumericTags(screenshotBase64, elements);
+      return {
+        screenshot: result.image,
+        tagMapping: result.mapping,
+      };
+    } catch (error) {
+      logger.error('Failed to capture tagged screenshot:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate grid overlay on screenshot
+   */
+  async generateGridOverlay(
+    driver: Browser,
+    gridSize: number = 10
+  ): Promise<{ screenshot: string; gridMap: Map<string, { x: number; y: number }> }> {
+    try {
+      const screenshotBase64 = await this.captureScreenshotAsBase64(driver);
+      const windowSize = await driver.getWindowSize();
+      const result = await overlayGridLines(
+        screenshotBase64,
+        gridSize,
+        windowSize.width,  // Logical width
+        windowSize.height  // Logical height
+      );
+      return {
+        screenshot: result.image,
+        gridMap: result.gridMap,  // Already in logical coordinates
+      };
+    } catch (error) {
+      logger.error('Failed to generate grid overlay:', error);
       throw error;
     }
   }

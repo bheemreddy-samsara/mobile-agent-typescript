@@ -42,4 +42,43 @@ export class AnthropicProvider extends BaseLLMProvider {
       throw error;
     }
   }
+
+  async queryWithVision(prompt: string, imageBase64: string, systemPrompt?: string): Promise<string> {
+    try {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 2000,
+        system: systemPrompt || '',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: prompt,
+              },
+              {
+                type: 'image' as any,
+                source: {
+                  type: 'base64',
+                  media_type: 'image/png',
+                  data: imageBase64,
+                } as any,
+              } as any,
+            ],
+          },
+        ],
+      });
+
+      const content = response.content[0];
+      if (content.type !== 'text') {
+        throw new Error('Unexpected content type from Anthropic vision response');
+      }
+
+      return content.text;
+    } catch (error) {
+      logger.error('Anthropic vision query failed:', error);
+      throw error;
+    }
+  }
 }

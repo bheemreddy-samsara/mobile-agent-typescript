@@ -20,6 +20,16 @@ export enum ActionType {
 }
 
 /**
+ * Vision-based detection methods
+ */
+export enum VisionMethod {
+  HIERARCHY = 'hierarchy',
+  VISION_TAGGING = 'vision-tagging',
+  GRID_OVERLAY = 'grid-overlay',
+  PURE_VISION = 'pure-vision',
+}
+
+/**
  * Types of UI elements
  */
 export enum UIElementType {
@@ -125,9 +135,36 @@ export interface UIState {
   activity: string;
   elements: UIElement[];
   screenshotPath?: string;
+  screenshotBase64?: string;
+  tagMapping?: Map<number, UIElement>;
+  gridMap?: Map<string, { x: number; y: number }>;
   xmlSource?: string;
   timestamp: Date;
   deviceInfo: Record<string, any>;
+}
+
+/**
+ * Configuration for pure vision approach
+ */
+export interface PureVisionConfig {
+  enabled: boolean;
+  minimumConfidence?: number;
+  usePercentageCoordinates?: boolean;
+}
+
+/**
+ * Configuration for vision fallback behavior
+ */
+export interface VisionFallbackConfig {
+  enabled: boolean;
+  fallbackOnElementNotFound?: boolean;
+  fallbackOnLowConfidence?: boolean;
+  confidenceThreshold?: number;
+  gridSize?: number;
+  alwaysUseVision?: boolean;
+  preferredMethod?: VisionMethod;
+  pureVisionConfig?: PureVisionConfig;
+  pureVisionOnly?: boolean;  // Skip tiers 1-3, use only pure vision
 }
 
 /**
@@ -141,6 +178,8 @@ export interface MobileAgentConfig {
   maxSteps?: number;
   timeoutSeconds?: number;
   verbose?: boolean;
+  enableVisionFallback?: boolean;
+  visionConfig?: VisionFallbackConfig;
 }
 
 /**
@@ -149,8 +188,15 @@ export interface MobileAgentConfig {
 export interface LLMActionResponse {
   action: string;
   elementId?: string;
+  coordinates?: { x: number; y: number };
+  location?: { x_percent: number; y_percent: number };  // For pure vision percentage-based coords
   parameters?: Record<string, any>;
   reasoning: string;
+  confidence?: number;
+  method?: VisionMethod;
+  tagId?: number;
+  gridPosition?: string;
+  element?: string;  // Element description for pure vision
 }
 
 /**

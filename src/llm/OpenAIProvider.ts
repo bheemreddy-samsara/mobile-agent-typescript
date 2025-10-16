@@ -51,5 +51,51 @@ export class OpenAIProvider extends BaseLLMProvider {
       throw error;
     }
   }
+
+  async queryWithVision(prompt: string, imageBase64: string, systemPrompt?: string): Promise<string> {
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+
+    if (systemPrompt) {
+      messages.push({
+        role: 'system',
+        content: systemPrompt,
+      });
+    }
+
+    messages.push({
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: prompt,
+        },
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:image/png;base64,${imageBase64}`,
+          },
+        },
+      ],
+    });
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages,
+        temperature: 0.7,
+        max_tokens: 2000,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No content in OpenAI vision response');
+      }
+
+      return content;
+    } catch (error) {
+      logger.error('OpenAI vision query failed:', error);
+      throw error;
+    }
+  }
 }
 
