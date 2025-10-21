@@ -16,7 +16,8 @@
     "prepublishOnly": "npm run build",
     "mcp-server": "node ./bin/mcp-server.js",
     "prepare": "husky install",
-    "bench:android": "TS_NODE_TRANSPILE_ONLY=1 npx ts-node examples/benchmarks/android-settings-bench.ts"
+    "bench:android": "TS_NODE_TRANSPILE_ONLY=1 npx ts-node examples/benchmarks/android-settings-bench.ts",
+    "bench:rn": "TS_NODE_TRANSPILE_ONLY=1 npx ts-node examples/benchmarks/sample-rn-app-bench.ts"
   },
   "keywords": [
     "mobile",

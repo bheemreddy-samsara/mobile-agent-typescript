@@ -391,6 +391,35 @@ npm test
 npm run lint
 ```
 
+## ⏱️ Wait Strategies & Benchmarks
+
+Actions in this SDK avoid brittle hard sleeps. Core gestures now use a UI‑settle waiter that samples `getPageSource()` and proceeds when two consecutive snapshots match or a timebox elapses. You can also block on a post‑condition via:
+
+- `agent.waitForCondition(condition, timeoutMs?, pollMs?)`
+- `agent.executeAndWait(instruction, expectedCondition, { timeoutMs?, pollMs? })`
+
+Benchmarks (example emulator runs)
+- Android Settings (no LLM):
+  - hard ≈ 1943 ms, uiSettle ≈ 2195 ms, exists (deterministic oracle) ≈ 1714 ms
+- Sample RN app (no LLM):
+  - hard ≈ 1813 ms, uiSettle ≈ 1333 ms, exists ≈ 344 ms
+
+Run locally
+```bash
+# Android Settings (no LLM)
+npm run bench:android
+
+# Sample RN app (no LLM)
+npm run bench:rn
+
+# LLM-based oracle wait (needs OPENAI_API_KEY)
+OPENAI_API_KEY=sk-... npm run bench:wait
+```
+
+LLM vs deterministic waits
+- Deterministic hierarchy checks (e.g., `waitForExist`) are usually fastest and cheapest.
+- LLM verification adds network/model latency; use it for complex assertions when hierarchy lacks signal. Recommended pattern: try deterministic oracle first, then fall back to LLM.
+
 ## 🔗 Related Projects
 
 - **[MobileAgentFramework](https://github.com/yourusername/MobileAgentFramework)** - Python version of this SDK
