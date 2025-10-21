@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.2.6/schema.json",
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
@@ -9,20 +9,23 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "suspicious": {
+        "noEmptyBlockStatements": "error",
+        "noExplicitAny": "off"
+      },
+      "style": {
+        "useNumberNamespace": "off",
+        "noNonNullAssertion": "off",
+        "noUnusedTemplateLiteral": "off"
+      },
+      "complexity": {
+        "useOptionalChain": "off"
+      }
     }
   },
-  "organizeImports": {
-    "enabled": true
-  },
   "files": {
-    "ignore": [
-      "node_modules/**",
-      "dist/**",
-      "coverage/**",
-      "examples/sample-rn-app/android/**",
-      "examples/sample-rn-app/ios/**"
-    ]
+    "include": ["src/**", "test/**", "examples/**"],
+    "ignoreUnknown": true
   }
 }
-

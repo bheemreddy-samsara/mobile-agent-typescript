@@ -2,25 +2,25 @@
  * Mobile Agent - Main agent for natural language mobile app testing
  */
 
-import type { Browser } from 'webdriverio';
-import { LLMProvider } from './llm/LLMProvider';
-import { OpenAIProvider } from './llm/OpenAIProvider';
-import { AnthropicProvider } from './llm/AnthropicProvider';
-import { UIObserver } from './observer/UIObserver';
+import * as fs from "node:fs";
+import type { Browser } from "webdriverio";
+import { AnthropicProvider } from "./llm/AnthropicProvider";
+import type { LLMProvider } from "./llm/LLMProvider";
+import { OpenAIProvider } from "./llm/OpenAIProvider";
+import { UIObserver } from "./observer/UIObserver";
 import {
-  MobileAgentConfig,
-  TestResult,
-  ActionStep,
+  type ActionStep,
   ActionType,
-  VerificationPoint,
+  type MobileAgentConfig,
+  type TestResult,
+  type UIElement,
+  type UIState,
+  type VerificationPoint,
   VerificationStatus,
-  UIState,
-  UIElement,
+  type VisionFallbackConfig,
   VisionMethod,
-  VisionFallbackConfig,
-} from './types';
-import { logger, LogLevel } from './utils/logger';
-import * as fs from 'fs';
+} from "./types";
+import { LogLevel, logger } from "./utils/logger";
 
 export class MobileAgent {
   private driver: Browser;
@@ -47,34 +47,50 @@ export class MobileAgent {
     this.config = {
       driver: config.driver,
       apiKey: config.apiKey,
-      llmProvider: config.llmProvider || 'openai',
-      model: config.model || (config.llmProvider === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'gpt-4o'),
+      llmProvider: config.llmProvider || "openai",
+      model:
+        config.model ||
+        (config.llmProvider === "anthropic" ? "claude-3-5-sonnet-20241022" : "gpt-4o"),
       maxSteps: config.maxSteps || 20,
       timeoutSeconds: config.timeoutSeconds || 300,
       verbose: config.verbose !== undefined ? config.verbose : false,
-      enableVisionFallback: config.enableVisionFallback !== undefined ? config.enableVisionFallback : true,
+      enableVisionFallback:
+        config.enableVisionFallback !== undefined ? config.enableVisionFallback : true,
       visionConfig: { ...defaultVisionConfig, ...config.visionConfig },
     };
 
     // Set up vision fallback configuration
     // Honor visionConfig.enabled if explicitly provided, otherwise use enableVisionFallback
-    const visionEnabled = config.visionConfig?.enabled !== undefined 
-      ? config.visionConfig.enabled 
-      : this.config.enableVisionFallback;
+    const visionEnabled =
+      config.visionConfig?.enabled !== undefined
+        ? config.visionConfig.enabled
+        : this.config.enableVisionFallback;
 
     this.visionConfig = {
       enabled: visionEnabled,
-      fallbackOnElementNotFound: config.visionConfig?.fallbackOnElementNotFound !== undefined ? config.visionConfig.fallbackOnElementNotFound : true,
-      fallbackOnLowConfidence: config.visionConfig?.fallbackOnLowConfidence !== undefined ? config.visionConfig.fallbackOnLowConfidence : true,
+      fallbackOnElementNotFound:
+        config.visionConfig?.fallbackOnElementNotFound !== undefined
+          ? config.visionConfig.fallbackOnElementNotFound
+          : true,
+      fallbackOnLowConfidence:
+        config.visionConfig?.fallbackOnLowConfidence !== undefined
+          ? config.visionConfig.fallbackOnLowConfidence
+          : true,
       confidenceThreshold: config.visionConfig?.confidenceThreshold || 0.7,
       gridSize: config.visionConfig?.gridSize || 10,
       alwaysUseVision: config.visionConfig?.alwaysUseVision || false,
       preferredMethod: config.visionConfig?.preferredMethod || VisionMethod.HIERARCHY,
       pureVisionOnly: config.visionConfig?.pureVisionOnly || false,
       pureVisionConfig: {
-        enabled: config.visionConfig?.pureVisionConfig?.enabled !== undefined ? config.visionConfig.pureVisionConfig.enabled : true,
+        enabled:
+          config.visionConfig?.pureVisionConfig?.enabled !== undefined
+            ? config.visionConfig.pureVisionConfig.enabled
+            : true,
         minimumConfidence: config.visionConfig?.pureVisionConfig?.minimumConfidence || 0.5,
-        usePercentageCoordinates: config.visionConfig?.pureVisionConfig?.usePercentageCoordinates !== undefined ? config.visionConfig.pureVisionConfig.usePercentageCoordinates : true,
+        usePercentageCoordinates:
+          config.visionConfig?.pureVisionConfig?.usePercentageCoordinates !== undefined
+            ? config.visionConfig.pureVisionConfig.usePercentageCoordinates
+            : true,
       },
     };
 
@@ -82,9 +98,9 @@ export class MobileAgent {
     this.observer = new UIObserver();
 
     // Initialize LLM provider
-    if (this.config.llmProvider === 'openai') {
+    if (this.config.llmProvider === "openai") {
       this.llm = new OpenAIProvider(this.config.apiKey, this.config.model);
-    } else if (this.config.llmProvider === 'anthropic') {
+    } else if (this.config.llmProvider === "anthropic") {
       this.llm = new AnthropicProvider(this.config.apiKey, this.config.model);
     } else {
       throw new Error(`Unknown LLM provider: ${this.config.llmProvider}`);
@@ -94,17 +110,17 @@ export class MobileAgent {
       logger.level = LogLevel.DEBUG;
     }
 
-    logger.info('MobileAgent initialized');
+    logger.info("MobileAgent initialized");
   }
 
   /**
    * Start a testing session
    */
   async startSession(): Promise<void> {
-    logger.info('Starting test session');
+    logger.info("Starting test session");
     this.testResult = {
       success: false,
-      task: '',
+      task: "",
       steps: [],
       verificationResults: [],
       startTime: new Date(),
@@ -125,7 +141,7 @@ export class MobileAgent {
    */
   async execute(instruction: string): Promise<void> {
     if (!this.testResult) {
-      throw new Error('Session not started. Call startSession() first.');
+      throw new Error("Session not started. Call startSession() first.");
     }
 
     logger.info(`Executing: ${instruction}`);
@@ -138,90 +154,90 @@ export class MobileAgent {
     try {
       // Check if pure vision only mode is enabled
       if (this.visionConfig.pureVisionOnly) {
-        logger.info('Pure vision only mode enabled, skipping hierarchy/tagging/grid');
+        logger.info("Pure vision only mode enabled, skipping hierarchy/tagging/grid");
         actionResponse = await this.tryPureVisionApproach(instruction);
         usedMethod = VisionMethod.PURE_VISION;
-        
+
         // Re-resolve target element (though pure vision typically uses coordinates)
         if (actionResponse.elementId) {
-          targetElement = this.currentState!.elements.find(
-            (e) => e.elementId === actionResponse.elementId
+          targetElement = this.currentState?.elements.find(
+            (e) => e.elementId === actionResponse.elementId,
           );
         } else {
           targetElement = undefined; // Pure vision uses coordinates, not element IDs
         }
-        
-        logger.info('✓ Pure vision approach succeeded');
+
+        logger.info("✓ Pure vision approach succeeded");
       } else {
         // Standard four-tier cascading fallback
         // Try Tier 1: Hierarchy-based approach
         actionResponse = await this.tryHierarchyApproach(instruction);
         usedMethod = VisionMethod.HIERARCHY;
-        
+
         // Find target element
         if (actionResponse.elementId) {
-          targetElement = this.currentState!.elements.find(
-            (e) => e.elementId === actionResponse.elementId
+          targetElement = this.currentState?.elements.find(
+            (e) => e.elementId === actionResponse.elementId,
           );
         }
 
         // Check if we need to fallback to vision
         const shouldFallback = this.shouldFallbackToVision(actionResponse, targetElement);
-        
+
         if (shouldFallback && this.visionConfig.enabled) {
-          logger.warn('Hierarchy approach insufficient, falling back to vision methods');
-          
+          logger.warn("Hierarchy approach insufficient, falling back to vision methods");
+
           // Try Tier 2: Vision with numeric tagging
           try {
             actionResponse = await this.tryVisionTaggingApproach(instruction);
             usedMethod = VisionMethod.VISION_TAGGING;
-            
+
             // Re-resolve target element after successful fallback
             if (actionResponse.elementId) {
-              targetElement = this.currentState!.elements.find(
-                (e) => e.elementId === actionResponse.elementId
+              targetElement = this.currentState?.elements.find(
+                (e) => e.elementId === actionResponse.elementId,
               );
             } else {
               targetElement = undefined; // Vision methods use coordinates, not element IDs
             }
-            
-            logger.info('✓ Vision tagging approach succeeded');
+
+            logger.info("✓ Vision tagging approach succeeded");
           } catch (error: any) {
             logger.warn(`Vision tagging failed: ${error.message}, trying grid overlay`);
-            
+
             // Try Tier 3: Grid overlay
             try {
               actionResponse = await this.tryGridOverlayApproach(instruction);
               usedMethod = VisionMethod.GRID_OVERLAY;
-              
+
               // Re-resolve target element after successful fallback
               if (actionResponse.elementId) {
-                targetElement = this.currentState!.elements.find(
-                  (e) => e.elementId === actionResponse.elementId
+                targetElement = this.currentState?.elements.find(
+                  (e) => e.elementId === actionResponse.elementId,
                 );
               } else {
                 targetElement = undefined; // Grid uses coordinates, not element IDs
               }
-              
-              logger.info('✓ Grid overlay approach succeeded');
+
+              logger.info("✓ Grid overlay approach succeeded");
             } catch (gridError: any) {
               logger.warn(`Grid overlay failed: ${gridError.message}, trying pure vision`);
-              
+
               // Try Tier 4: Pure vision (last resort)
               if (this.visionConfig.pureVisionConfig?.enabled) {
                 actionResponse = await this.tryPureVisionApproach(instruction);
                 usedMethod = VisionMethod.PURE_VISION;
-                
+
                 // Re-resolve target element after successful fallback
                 if (actionResponse.elementId) {
-                  targetElement = this.currentState!.elements.find(
-                    (e) => e.elementId === actionResponse.elementId
+                  targetElement = this.currentState?.elements.find(
+                    (e) => e.elementId === actionResponse.elementId,
                   );
                 } else {
                   targetElement = undefined; // Pure vision uses coordinates, not element IDs
                 }
-                
-                logger.info('✓ Pure vision approach succeeded (Tier 4)');
+
+                logger.info("✓ Pure vision approach succeeded (Tier 4)");
               } else {
                 throw gridError; // Rethrow grid error if pure vision disabled
               }
@@ -233,14 +249,10 @@ export class MobileAgent {
       logger.debug(`Action determined using ${usedMethod}: ${JSON.stringify(actionResponse)}`);
 
       // Execute the action
-      const step = await this.executeAction(
-        actionResponse.action as ActionType,
-        targetElement,
-        {
-          ...actionResponse.parameters || {},
-          coordinates: actionResponse.coordinates,
-        }
-      );
+      const step = await this.executeAction(actionResponse.action as ActionType, targetElement, {
+        ...(actionResponse.parameters || {}),
+        coordinates: actionResponse.coordinates,
+      });
 
       step.description = `[${usedMethod}] ${actionResponse.reasoning}`;
       this.testResult.steps.push(step);
@@ -248,7 +260,7 @@ export class MobileAgent {
 
       logger.info(`✓ Action executed successfully using ${usedMethod}`);
     } catch (error: any) {
-      logger.error('Execution failed:', error);
+      logger.error("Execution failed:", error);
       const failedStep: ActionStep = {
         actionType: ActionType.CLICK,
         parameters: {},
@@ -266,11 +278,11 @@ export class MobileAgent {
    * Try hierarchy-based approach (Tier 1)
    */
   private async tryHierarchyApproach(instruction: string) {
-    this.currentState = await this.observer.getUIState(this.driver, 'none');
+    this.currentState = await this.observer.getUIState(this.driver, "none");
     const actionResponse = await this.llm.generateAction(
       this.currentState,
       instruction,
-      this.actionHistory
+      this.actionHistory,
     );
     actionResponse.method = VisionMethod.HIERARCHY;
     return actionResponse;
@@ -280,11 +292,11 @@ export class MobileAgent {
    * Try vision with numeric tagging (Tier 2)
    */
   private async tryVisionTaggingApproach(instruction: string) {
-    this.currentState = await this.observer.getUIState(this.driver, 'tagged');
+    this.currentState = await this.observer.getUIState(this.driver, "tagged");
     const actionResponse = await this.llm.generateActionWithVisionTagging(
       this.currentState,
       instruction,
-      this.actionHistory
+      this.actionHistory,
     );
     return actionResponse;
   }
@@ -295,47 +307,48 @@ export class MobileAgent {
   private async tryGridOverlayApproach(instruction: string) {
     this.currentState = await this.observer.getUIState(
       this.driver,
-      'grid',
-      this.visionConfig.gridSize
+      "grid",
+      this.visionConfig.gridSize,
     );
     const actionResponse = await this.llm.generateActionWithGridOverlay(
       this.currentState,
       instruction,
-      this.actionHistory
+      this.actionHistory,
     );
     return actionResponse;
   }
 
   private async tryPureVisionApproach(instruction: string) {
     // Update current state (for consistency with other tiers, even though pure vision doesn't use hierarchy)
-    this.currentState = await this.observer.getUIState(this.driver, 'screenshot');
-    
+    this.currentState = await this.observer.getUIState(this.driver, "screenshot");
+
     // Capture raw screenshot without overlays
-    const screenshotBase64 = this.currentState.screenshotBase64 || 
-      await this.observer.captureScreenshotAsBase64(this.driver);
+    const screenshotBase64 =
+      this.currentState.screenshotBase64 ||
+      (await this.observer.captureScreenshotAsBase64(this.driver));
     const windowSize = await this.driver.getWindowSize();
 
     // Check minimum confidence requirement
     const minConfidence = this.visionConfig.pureVisionConfig?.minimumConfidence || 0.5;
-    
+
     const actionResponse = await this.llm.generateActionWithPureVision(
       screenshotBase64,
       instruction,
       windowSize,
-      this.actionHistory
+      this.actionHistory,
     );
 
     // Validate confidence
     if (actionResponse.confidence && actionResponse.confidence < minConfidence) {
       throw new Error(
-        `Pure vision confidence too low: ${actionResponse.confidence} < ${minConfidence}`
+        `Pure vision confidence too low: ${actionResponse.confidence} < ${minConfidence}`,
       );
     }
 
     logger.debug(
       `Pure vision located element "${actionResponse.element}" at ` +
-      `${actionResponse.location?.x_percent}%, ${actionResponse.location?.y_percent}% ` +
-      `(${actionResponse.coordinates?.x}, ${actionResponse.coordinates?.y})`
+        `${actionResponse.location?.x_percent}%, ${actionResponse.location?.y_percent}% ` +
+        `(${actionResponse.coordinates?.x}, ${actionResponse.coordinates?.y})`,
     );
 
     return actionResponse;
@@ -351,14 +364,16 @@ export class MobileAgent {
 
     // Fallback if element not found
     if (this.visionConfig.fallbackOnElementNotFound && actionResponse.elementId && !targetElement) {
-      logger.debug('Fallback triggered: Element not found');
+      logger.debug("Fallback triggered: Element not found");
       return true;
     }
 
     // Fallback if confidence is too low
-    if (this.visionConfig.fallbackOnLowConfidence && 
-        actionResponse.confidence !== undefined &&
-        this.visionConfig.confidenceThreshold !== undefined) {
+    if (
+      this.visionConfig.fallbackOnLowConfidence &&
+      actionResponse.confidence !== undefined &&
+      this.visionConfig.confidenceThreshold !== undefined
+    ) {
       if (actionResponse.confidence < this.visionConfig.confidenceThreshold) {
         logger.debug(`Fallback triggered: Low confidence (${actionResponse.confidence})`);
         return true;
@@ -366,8 +381,8 @@ export class MobileAgent {
     }
 
     // Fallback if action is error
-    if (actionResponse.action === 'error') {
-      logger.debug('Fallback triggered: Error action');
+    if (actionResponse.action === "error") {
+      logger.debug("Fallback triggered: Error action");
       return true;
     }
 
@@ -379,7 +394,7 @@ export class MobileAgent {
    */
   async assert(condition: string): Promise<boolean> {
     if (!this.testResult) {
-      throw new Error('Session not started. Call startSession() first.');
+      throw new Error("Session not started. Call startSession() first.");
     }
 
     logger.info(`Verifying: ${condition}`);
@@ -392,7 +407,7 @@ export class MobileAgent {
       const verificationResponse = await this.llm.verifyCondition(
         this.currentState,
         condition,
-        this.actionHistory
+        this.actionHistory,
       );
 
       logger.debug(`Verification result: ${JSON.stringify(verificationResponse)}`);
@@ -400,11 +415,11 @@ export class MobileAgent {
       const verification: VerificationPoint = {
         name: condition,
         description: condition,
-        assertionType: 'llm_verification',
+        assertionType: "llm_verification",
         expectedValue: true,
         actualValue: verificationResponse.passed,
         status: verificationResponse.passed ? VerificationStatus.PASSED : VerificationStatus.FAILED,
-        errorMessage: verificationResponse.issues?.join(', '),
+        errorMessage: verificationResponse.issues?.join(", "),
       };
 
       this.testResult.verificationResults.push(verification);
@@ -417,11 +432,11 @@ export class MobileAgent {
 
       return verificationResponse.passed;
     } catch (error: any) {
-      logger.error('Assertion failed:', error);
+      logger.error("Assertion failed:", error);
       const verification: VerificationPoint = {
         name: condition,
         description: condition,
-        assertionType: 'llm_verification',
+        assertionType: "llm_verification",
         expectedValue: true,
         actualValue: false,
         status: VerificationStatus.ERROR,
@@ -435,14 +450,14 @@ export class MobileAgent {
   /**
    * Stop the testing session
    */
-  async stopSession(status: 'success' | 'failure'): Promise<TestResult> {
+  async stopSession(status: "success" | "failure"): Promise<TestResult> {
     if (!this.testResult) {
-      throw new Error('Session not started. Call startSession() first.');
+      throw new Error("Session not started. Call startSession() first.");
     }
 
     logger.info(`Stopping session with status: ${status}`);
 
-    this.testResult.success = status === 'success';
+    this.testResult.success = status === "success";
     this.testResult.endTime = new Date();
     this.testResult.durationSeconds =
       (this.testResult.endTime.getTime() - this.testResult.startTime.getTime()) / 1000;
@@ -467,14 +482,14 @@ export class MobileAgent {
   private async executeAction(
     actionType: ActionType,
     targetElement?: UIElement,
-    parameters: Record<string, any> = {}
+    parameters: Record<string, any> = {},
   ): Promise<ActionStep> {
     const step: ActionStep = {
       actionType,
       targetElement,
       targetElementId: targetElement?.elementId,
       parameters,
-      description: '',
+      description: "",
       timestamp: new Date(),
       success: false,
     };
@@ -484,8 +499,10 @@ export class MobileAgent {
       try {
         const before = await this.observer.captureScreenshotAsBase64(this.driver);
         step.screenshotBefore = before;
-        this.maybePersistScreenshot(before, 'before');
-      } catch {}
+        this.maybePersistScreenshot(before, "before");
+      } catch {
+        /* ignoring screenshot failure before action */
+      }
 
       switch (actionType) {
         case ActionType.CLICK:
@@ -494,18 +511,15 @@ export class MobileAgent {
           break;
 
         case ActionType.TYPE_TEXT:
-          await this.typeText(targetElement, parameters.text || '', parameters.coordinates);
+          await this.typeText(targetElement, parameters.text || "", parameters.coordinates);
           break;
 
         case ActionType.SWIPE:
-          await this.swipe(
-            parameters.direction || 'up',
-            parameters.distance || 0.5
-          );
+          await this.swipe(parameters.direction || "up", parameters.distance || 0.5);
           break;
 
         case ActionType.SCROLL:
-          await this.scroll(parameters.direction || 'down');
+          await this.scroll(parameters.direction || "down");
           break;
 
         case ActionType.LONG_PRESS:
@@ -532,8 +546,10 @@ export class MobileAgent {
       try {
         const after = await this.observer.captureScreenshotAsBase64(this.driver);
         step.screenshotAfter = after;
-        this.maybePersistScreenshot(after, 'after');
-      } catch {}
+        this.maybePersistScreenshot(after, "after");
+      } catch {
+        /* ignoring screenshot failure after action */
+      }
 
       step.success = true;
     } catch (error: any) {
@@ -550,26 +566,26 @@ export class MobileAgent {
    */
   private async clickElement(
     element?: UIElement,
-    coordinates?: { x: number; y: number }
+    coordinates?: { x: number; y: number },
   ): Promise<void> {
     let targetCoords = coordinates;
 
     // If no coordinates provided, get from element
     if (!targetCoords) {
       if (!element) {
-        throw new Error('No element or coordinates to click');
+        throw new Error("No element or coordinates to click");
       }
 
       const center = this.observer.getElementCenter(element);
       if (!center) {
-        throw new Error('Element has no bounds');
+        throw new Error("Element has no bounds");
       }
       targetCoords = center;
     }
 
     logger.debug(`Clicking at (${targetCoords.x}, ${targetCoords.y})`);
     await this.driver.touchAction({
-      action: 'tap',
+      action: "tap",
       x: targetCoords.x,
       y: targetCoords.y,
     });
@@ -583,15 +599,15 @@ export class MobileAgent {
    */
   private async typeText(
     element?: UIElement,
-    text: string = '',
-    coordinates?: { x: number; y: number }
+    text = "",
+    coordinates?: { x: number; y: number },
   ): Promise<void> {
     // Click to focus (using either element or coordinates)
     await this.clickElement(element, coordinates);
 
     // Type text
     logger.debug(`Typing text: ${text}`);
-    await this.driver.keys(text.split(''));
+    await this.driver.keys(text.split(""));
 
     // Wait a bit
     await this.driver.pause(500);
@@ -600,7 +616,7 @@ export class MobileAgent {
   /**
    * Swipe in a direction
    */
-  private async swipe(direction: string, distance: number = 0.5): Promise<void> {
+  private async swipe(direction: string, distance = 0.5): Promise<void> {
     const windowSize = await this.driver.getWindowSize();
     const centerX = Math.floor(windowSize.width / 2);
     const centerY = Math.floor(windowSize.height / 2);
@@ -612,19 +628,19 @@ export class MobileAgent {
     let endY = centerY;
 
     switch (direction.toLowerCase()) {
-      case 'up':
+      case "up":
         startY = centerY + delta;
         endY = centerY - delta;
         break;
-      case 'down':
+      case "down":
         startY = centerY - delta;
         endY = centerY + delta;
         break;
-      case 'left':
+      case "left":
         startX = centerX + delta;
         endX = centerX - delta;
         break;
-      case 'right':
+      case "right":
         startX = centerX - delta;
         endX = centerX + delta;
         break;
@@ -632,10 +648,10 @@ export class MobileAgent {
 
     logger.debug(`Swiping ${direction}: (${startX},${startY}) -> (${endX},${endY})`);
     await this.driver.touchAction([
-      { action: 'press', x: startX, y: startY },
-      { action: 'wait', ms: 100 },
-      { action: 'moveTo', x: endX, y: endY },
-      { action: 'release' },
+      { action: "press", x: startX, y: startY },
+      { action: "wait", ms: 100 },
+      { action: "moveTo", x: endX, y: endY },
+      { action: "release" },
     ]);
 
     await this.driver.pause(500);
@@ -653,28 +669,28 @@ export class MobileAgent {
    */
   private async longPress(
     element?: UIElement,
-    coordinates?: { x: number; y: number }
+    coordinates?: { x: number; y: number },
   ): Promise<void> {
     let targetCoords = coordinates;
 
     // If no coordinates provided, get from element
     if (!targetCoords) {
       if (!element) {
-        throw new Error('No element or coordinates to long press');
+        throw new Error("No element or coordinates to long press");
       }
 
       const center = this.observer.getElementCenter(element);
       if (!center) {
-        throw new Error('Element has no bounds');
+        throw new Error("Element has no bounds");
       }
       targetCoords = center;
     }
 
     logger.debug(`Long pressing at (${targetCoords.x}, ${targetCoords.y})`);
     await this.driver.touchAction([
-      { action: 'press', x: targetCoords.x, y: targetCoords.y },
-      { action: 'wait', ms: 1000 },
-      { action: 'release' },
+      { action: "press", x: targetCoords.x, y: targetCoords.y },
+      { action: "wait", ms: 1000 },
+      { action: "release" },
     ]);
 
     await this.driver.pause(500);
@@ -685,31 +701,28 @@ export class MobileAgent {
    */
   private async doubleTap(
     element?: UIElement,
-    coordinates?: { x: number; y: number }
+    coordinates?: { x: number; y: number },
   ): Promise<void> {
     let targetCoords = coordinates;
     if (!targetCoords) {
-      if (!element) throw new Error('No element or coordinates to double tap');
+      if (!element) throw new Error("No element or coordinates to double tap");
       const center = this.observer.getElementCenter(element);
-      if (!center) throw new Error('Element has no bounds');
+      if (!center) throw new Error("Element has no bounds");
       targetCoords = center;
     }
 
-    await this.driver.touchAction({ action: 'tap', x: targetCoords.x, y: targetCoords.y });
+    await this.driver.touchAction({ action: "tap", x: targetCoords.x, y: targetCoords.y });
     await this.driver.pause(75);
-    await this.driver.touchAction({ action: 'tap', x: targetCoords.x, y: targetCoords.y });
+    await this.driver.touchAction({ action: "tap", x: targetCoords.x, y: targetCoords.y });
     await this.driver.pause(300);
   }
 
   /**
    * Pinch gesture around a target point (zoom out)
    */
-  private async pinch(
-    element?: UIElement,
-    coordinates?: { x: number; y: number }
-  ): Promise<void> {
+  private async pinch(element?: UIElement, coordinates?: { x: number; y: number }): Promise<void> {
     const center = coordinates || (element ? this.observer.getElementCenter(element) : undefined);
-    if (!center) throw new Error('No target for pinch gesture');
+    if (!center) throw new Error("No target for pinch gesture");
 
     const startOffset = 100; // pixels from center
     const duration = 250;
@@ -721,23 +734,27 @@ export class MobileAgent {
 
     await this.driver.performActions([
       {
-        type: 'pointer', id: 'finger1', parameters: { pointerType: 'touch' },
+        type: "pointer",
+        id: "finger1",
+        parameters: { pointerType: "touch" },
         actions: [
-          { type: 'pointerMove', duration: 0, x: finger1Start.x, y: finger1Start.y },
-          { type: 'pointerDown', button: 0 },
-          { type: 'pause', duration: 50 },
-          { type: 'pointerMove', duration, x: finger1End.x, y: finger1End.y },
-          { type: 'pointerUp', button: 0 },
+          { type: "pointerMove", duration: 0, x: finger1Start.x, y: finger1Start.y },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: 50 },
+          { type: "pointerMove", duration, x: finger1End.x, y: finger1End.y },
+          { type: "pointerUp", button: 0 },
         ],
       },
       {
-        type: 'pointer', id: 'finger2', parameters: { pointerType: 'touch' },
+        type: "pointer",
+        id: "finger2",
+        parameters: { pointerType: "touch" },
         actions: [
-          { type: 'pointerMove', duration: 0, x: finger2Start.x, y: finger2Start.y },
-          { type: 'pointerDown', button: 0 },
-          { type: 'pause', duration: 50 },
-          { type: 'pointerMove', duration, x: finger2End.x, y: finger2End.y },
-          { type: 'pointerUp', button: 0 },
+          { type: "pointerMove", duration: 0, x: finger2Start.x, y: finger2Start.y },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: 50 },
+          { type: "pointerMove", duration, x: finger2End.x, y: finger2End.y },
+          { type: "pointerUp", button: 0 },
         ],
       },
     ] as any);
@@ -749,12 +766,9 @@ export class MobileAgent {
   /**
    * Zoom gesture around a target point (zoom in)
    */
-  private async zoom(
-    element?: UIElement,
-    coordinates?: { x: number; y: number }
-  ): Promise<void> {
+  private async zoom(element?: UIElement, coordinates?: { x: number; y: number }): Promise<void> {
     const center = coordinates || (element ? this.observer.getElementCenter(element) : undefined);
-    if (!center) throw new Error('No target for zoom gesture');
+    if (!center) throw new Error("No target for zoom gesture");
 
     const endOffset = 100; // pixels from center
     const duration = 250;
@@ -766,23 +780,27 @@ export class MobileAgent {
 
     await this.driver.performActions([
       {
-        type: 'pointer', id: 'finger1', parameters: { pointerType: 'touch' },
+        type: "pointer",
+        id: "finger1",
+        parameters: { pointerType: "touch" },
         actions: [
-          { type: 'pointerMove', duration: 0, x: finger1Start.x, y: finger1Start.y },
-          { type: 'pointerDown', button: 0 },
-          { type: 'pause', duration: 50 },
-          { type: 'pointerMove', duration, x: finger1End.x, y: finger1End.y },
-          { type: 'pointerUp', button: 0 },
+          { type: "pointerMove", duration: 0, x: finger1Start.x, y: finger1Start.y },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: 50 },
+          { type: "pointerMove", duration, x: finger1End.x, y: finger1End.y },
+          { type: "pointerUp", button: 0 },
         ],
       },
       {
-        type: 'pointer', id: 'finger2', parameters: { pointerType: 'touch' },
+        type: "pointer",
+        id: "finger2",
+        parameters: { pointerType: "touch" },
         actions: [
-          { type: 'pointerMove', duration: 0, x: finger2Start.x, y: finger2Start.y },
-          { type: 'pointerDown', button: 0 },
-          { type: 'pause', duration: 50 },
-          { type: 'pointerMove', duration, x: finger2End.x, y: finger2End.y },
-          { type: 'pointerUp', button: 0 },
+          { type: "pointerMove", duration: 0, x: finger2Start.x, y: finger2Start.y },
+          { type: "pointerDown", button: 0 },
+          { type: "pause", duration: 50 },
+          { type: "pointerMove", duration, x: finger2End.x, y: finger2End.y },
+          { type: "pointerUp", button: 0 },
         ],
       },
     ] as any);
@@ -794,7 +812,7 @@ export class MobileAgent {
   /**
    * Persist screenshot to artifacts directory if configured.
    */
-  private maybePersistScreenshot(base64: string, phase: 'before' | 'after') {
+  private maybePersistScreenshot(base64: string, phase: "before" | "after") {
     try {
       const dir = process.env.ARTIFACTS_DIR;
       if (!dir) return;
@@ -803,8 +821,10 @@ export class MobileAgent {
       }
       const idx = ++this.screenshotCounter;
       const filePath = `${dir}/step_${idx}_${phase}.png`;
-      fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
+      fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
       this.testResult?.screenshots.push(filePath);
-    } catch {}
+    } catch {
+      /* ignoring artifact persistence failure */
+    }
   }
 }
