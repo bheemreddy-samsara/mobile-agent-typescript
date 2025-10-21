@@ -448,6 +448,50 @@ export class MobileAgent {
   }
 
   /**
+   * Verify a condition once without mutating the testResult (utility for waits)
+   */
+  private async verifyConditionOneShot(condition: string): Promise<boolean> {
+    try {
+      this.currentState = await this.observer.getUIState(this.driver);
+      const res = await this.llm.verifyCondition(this.currentState, condition, this.actionHistory);
+      return Boolean(res.passed);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Wait until a verification condition passes (verification-as-a-wait).
+   * Falls back to timebox expiry to avoid hangs.
+   */
+  async waitForCondition(condition: string, timeoutMs = 5000, pollMs = 800): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const ok = await this.verifyConditionOneShot(condition);
+      if (ok) return true;
+      await this.driver.pause(pollMs);
+    }
+    return false;
+  }
+
+  /**
+   * Execute an instruction, then block until a verification condition passes
+   * or the timeout elapses. Returns whether the condition passed in time.
+   */
+  async executeAndWait(
+    instruction: string,
+    expectedCondition: string,
+    options: { timeoutMs?: number; pollMs?: number } = {},
+  ): Promise<boolean> {
+    await this.execute(instruction);
+    return await this.waitForCondition(
+      expectedCondition,
+      options.timeoutMs ?? 5000,
+      options.pollMs ?? 800,
+    );
+  }
+
+  /**
    * Stop the testing session
    */
   async stopSession(status: "success" | "failure"): Promise<TestResult> {
@@ -590,8 +634,8 @@ export class MobileAgent {
       y: targetCoords.y,
     });
 
-    // Wait a bit for UI to settle
-    await this.driver.pause(500);
+    // Wait for UI to settle rather than fixed sleep
+    await this.waitForUiSettle(1200);
   }
 
   /**
@@ -609,8 +653,8 @@ export class MobileAgent {
     logger.debug(`Typing text: ${text}`);
     await this.driver.keys(text.split(""));
 
-    // Wait a bit
-    await this.driver.pause(500);
+    // Wait for keyboard/IME updates to settle
+    await this.waitForUiSettle(1000);
   }
 
   /**
@@ -654,7 +698,7 @@ export class MobileAgent {
       { action: "release" },
     ]);
 
-    await this.driver.pause(500);
+    await this.waitForUiSettle(1000);
   }
 
   /**
@@ -714,7 +758,7 @@ export class MobileAgent {
     await this.driver.touchAction({ action: "tap", x: targetCoords.x, y: targetCoords.y });
     await this.driver.pause(75);
     await this.driver.touchAction({ action: "tap", x: targetCoords.x, y: targetCoords.y });
-    await this.driver.pause(300);
+    await this.waitForUiSettle(800);
   }
 
   /**
@@ -760,7 +804,7 @@ export class MobileAgent {
     ] as any);
 
     await this.driver.releaseActions();
-    await this.driver.pause(300);
+    await this.waitForUiSettle(800);
   }
 
   /**
@@ -806,7 +850,38 @@ export class MobileAgent {
     ] as any);
 
     await this.driver.releaseActions();
-    await this.driver.pause(300);
+    await this.waitForUiSettle(800);
+  }
+
+  /**
+   * Wait until the UI appears stable by sampling page source over time.
+   * This avoids brittle hard sleeps after actions.
+   */
+  private async waitForUiSettle(
+    timeoutMs = 1200,
+    stableIterations = 2,
+    pollMs = 150,
+  ): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    let lastSource: string | undefined;
+    let stable = 0;
+
+    while (Date.now() < deadline) {
+      try {
+        const src = await this.driver.getPageSource();
+        if (lastSource !== undefined && src === lastSource) {
+          stable++;
+          if (stable >= stableIterations) return;
+        } else {
+          stable = 0;
+          lastSource = src;
+        }
+      } catch {
+        // If we can't fetch immediately, just continue polling
+      }
+      await this.driver.pause(pollMs);
+    }
+    // Timeboxed: proceed even if not strictly stabilized
   }
 
   /**

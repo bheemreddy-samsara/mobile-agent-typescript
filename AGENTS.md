@@ -614,6 +614,28 @@ This skips hierarchy/tags/grid and uses only the pure vision approach with perce
 
 ---
 
+## ⏱️ Wait Strategies & Benchmarks
+
+Actions driven by agents should avoid brittle fixed sleeps. This SDK includes two wait approaches you can use from MCP flows:
+
+- UI‑Settle Waits: after actions, the agent samples the page source until two consecutive snapshots match (or a timebox expires). This stabilizes animations and loading.
+- Verification‑as‑Wait: the agent can block on a post‑condition using `mobile_assert` repeatedly until it passes or times out. Prefer deterministic hierarchy checks first; fall back to LLM vision assertions when hierarchy lacks signal.
+
+Benchmarks (example emulator runs)
+- Android Settings (no LLM): hard ≈ 1943 ms, uiSettle ≈ 2195 ms, exists (deterministic) ≈ 1714 ms
+- Sample RN app (no LLM): hard ≈ 1813 ms, uiSettle ≈ 1333 ms, exists ≈ 344 ms
+
+Run locally from repo
+```bash
+npm run bench:android   # Android Settings (no LLM)
+npm run bench:rn        # Sample RN app (no LLM)
+OPENAI_API_KEY=sk-... npm run bench:wait  # LLM-based oracle harness
+```
+
+Recommendation: In MCP workflows, first try deterministic assertions (e.g., presence/visibility via hierarchy). If those are inconclusive, escalate to vision-based LLM verification with a confidence threshold.
+
+---
+
 ## 🔬 Technical Deep Dives
 
 ### Four-Tier Vision System
@@ -709,4 +731,3 @@ MIT License - see [LICENSE](./LICENSE) for details.
 **Last Updated**: October 16, 2025  
 **MCP SDK Version**: 1.20.0  
 **Mobile Agent SDK Version**: 1.0.0
-

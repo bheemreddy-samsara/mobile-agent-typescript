@@ -12,9 +12,12 @@
     "test": "jest",
     "lint": "biome check .",
     "format": "biome format --write .",
+    "bench:wait": "TS_NODE_TRANSPILE_ONLY=1 npx ts-node examples/benchmarks/wait-bench.ts",
     "prepublishOnly": "npm run build",
     "mcp-server": "node ./bin/mcp-server.js",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "bench:android": "TS_NODE_TRANSPILE_ONLY=1 npx ts-node examples/benchmarks/android-settings-bench.ts",
+    "bench:rn": "TS_NODE_TRANSPILE_ONLY=1 npx ts-node examples/benchmarks/sample-rn-app-bench.ts"
   },
   "keywords": [
     "mobile",
