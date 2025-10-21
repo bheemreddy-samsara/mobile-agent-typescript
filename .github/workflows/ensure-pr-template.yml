@@ -1,0 +1,49 @@
+name: Ensure PR Description Format
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  enforce-template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure PR body follows template
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) return;
+            const body = pr.body || '';
+
+            const required = [
+              '## Summary',
+              '## Changes',
+              '## Motivation',
+              '## Testing',
+              '## Risks',
+              '## Checklist'
+            ];
+
+            const missing = required.filter(h => !body.includes(h));
+
+            if (missing.length === 0) {
+              core.info('PR body already follows the template.');
+              return;
+            }
+
+            const template = `## Summary\n\n- Briefly explain the purpose and scope of this PR.\n\n## Changes\n\n- Key, user-visible changes\n- Notable refactors or config updates\n- Dependency/tooling changes\n\n## Motivation & Context\n\n- Why is this change needed? Link issues if applicable.\n\n## Testing\n\n- How this was tested (unit/integration/manual)\n- Commands to reproduce locally\n\n## Risks & Rollout\n\n- Breaking changes: yes/no (explain)\n- Rollout/verification plan\n\n## Checklist\n\n- [ ] Lint passes: \`npm run lint\`\n- [ ] Tests pass: \`npm test\`\n- [ ] Docs updated (if needed)\n- [ ] Title follows conventional commits\n`;
+
+            const newBody = `${template}\n---\n\n### Original Description\n\n${body}`.trim();
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              body: newBody,
+            });
+
+            core.notice(`Updated PR body to include template. Missing sections: ${missing.join(', ')}`);
