@@ -1,49 +1,35 @@
-# Pull Request
+## Summary
 
-## 📋 Summary
+- Briefly explain the purpose and scope of this PR.
 
-<!-- Brief description of what this PR does -->
+## Changes
 
-## 🎯 Changes
+- Bullet the key, user‑visible changes
+- Mention notable refactors or config updates
+- Note any dependency or tooling changes
 
-<!-- List the main changes in this PR -->
+## Motivation & Context
 
-- 
-- 
-- 
+- Why is this change needed? Link to issues if applicable.
 
-## 🧪 Testing
+## Screenshots / Demos (optional)
 
-<!-- How was this tested? -->
+- Add images or terminal logs that help reviewers.
 
-- [ ] Manual testing
-- [ ] Unit tests added/updated
-- [ ] Integration tests added/updated
-- [ ] Tested on Android
-- [ ] Tested on iOS
+## Risks & Rollout
 
-## 📸 Screenshots / Demo
+- Breaking changes: yes/no (explain)
+- Rollout plan: how to verify in CI or locally
 
-<!-- If applicable, add screenshots or demo output -->
+## Testing
 
-## 📚 Documentation
+- How this was tested (unit/integration/manual)
+- Commands to reproduce locally
 
-- [ ] README.md updated
-- [ ] AGENTS.md updated (if MCP-related)
-- [ ] Code comments added
-- [ ] Examples added/updated
+## Checklist
 
-## ✅ Checklist
-
-- [ ] Code follows project style guidelines
-- [ ] All tests pass
-- [ ] No linter errors
-- [ ] Branch is up to date with main
-- [ ] Commit messages are clear
-
-## 🔗 Related Issues
-
-<!-- Link to related issues -->
-
-Closes #
+- [ ] Lint passes: `npm run lint`
+- [ ] Tests pass: `npm test`
+- [ ] Docs updated (if needed)
+- [ ] PR title follows conventional commits (e.g., `feat:`, `fix:`, `chore:`)
 
