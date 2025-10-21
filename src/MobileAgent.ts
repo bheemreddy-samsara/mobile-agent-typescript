@@ -20,6 +20,7 @@ import {
   VisionFallbackConfig,
 } from './types';
 import { logger, LogLevel } from './utils/logger';
+import * as fs from 'fs';
 
 export class MobileAgent {
   private driver: Browser;
@@ -30,6 +31,7 @@ export class MobileAgent {
   private testResult?: TestResult;
   private actionHistory: string[] = [];
   private currentState?: UIState;
+  private screenshotCounter = 0;
 
   constructor(config: MobileAgentConfig) {
     const defaultVisionConfig: VisionFallbackConfig = {
@@ -478,6 +480,13 @@ export class MobileAgent {
     };
 
     try {
+      // Capture pre-action screenshot
+      try {
+        const before = await this.observer.captureScreenshotAsBase64(this.driver);
+        step.screenshotBefore = before;
+        this.maybePersistScreenshot(before, 'before');
+      } catch {}
+
       switch (actionType) {
         case ActionType.CLICK:
         case ActionType.TAP:
@@ -503,9 +512,28 @@ export class MobileAgent {
           await this.longPress(targetElement, parameters.coordinates);
           break;
 
+        case ActionType.DOUBLE_TAP:
+          await this.doubleTap(targetElement, parameters.coordinates);
+          break;
+
+        case ActionType.PINCH:
+          await this.pinch(targetElement, parameters.coordinates);
+          break;
+
+        case ActionType.ZOOM:
+          await this.zoom(targetElement, parameters.coordinates);
+          break;
+
         default:
           throw new Error(`Unsupported action type: ${actionType}`);
       }
+
+      // Capture post-action screenshot
+      try {
+        const after = await this.observer.captureScreenshotAsBase64(this.driver);
+        step.screenshotAfter = after;
+        this.maybePersistScreenshot(after, 'after');
+      } catch {}
 
       step.success = true;
     } catch (error: any) {
@@ -651,5 +679,132 @@ export class MobileAgent {
 
     await this.driver.pause(500);
   }
-}
 
+  /**
+   * Double tap on an element or coordinates
+   */
+  private async doubleTap(
+    element?: UIElement,
+    coordinates?: { x: number; y: number }
+  ): Promise<void> {
+    let targetCoords = coordinates;
+    if (!targetCoords) {
+      if (!element) throw new Error('No element or coordinates to double tap');
+      const center = this.observer.getElementCenter(element);
+      if (!center) throw new Error('Element has no bounds');
+      targetCoords = center;
+    }
+
+    await this.driver.touchAction({ action: 'tap', x: targetCoords.x, y: targetCoords.y });
+    await this.driver.pause(75);
+    await this.driver.touchAction({ action: 'tap', x: targetCoords.x, y: targetCoords.y });
+    await this.driver.pause(300);
+  }
+
+  /**
+   * Pinch gesture around a target point (zoom out)
+   */
+  private async pinch(
+    element?: UIElement,
+    coordinates?: { x: number; y: number }
+  ): Promise<void> {
+    const center = coordinates || (element ? this.observer.getElementCenter(element) : undefined);
+    if (!center) throw new Error('No target for pinch gesture');
+
+    const startOffset = 100; // pixels from center
+    const duration = 250;
+
+    const finger1Start = { x: center.x - startOffset, y: center.y };
+    const finger1End = { x: center.x - 10, y: center.y };
+    const finger2Start = { x: center.x + startOffset, y: center.y };
+    const finger2End = { x: center.x + 10, y: center.y };
+
+    await this.driver.performActions([
+      {
+        type: 'pointer', id: 'finger1', parameters: { pointerType: 'touch' },
+        actions: [
+          { type: 'pointerMove', duration: 0, x: finger1Start.x, y: finger1Start.y },
+          { type: 'pointerDown', button: 0 },
+          { type: 'pause', duration: 50 },
+          { type: 'pointerMove', duration, x: finger1End.x, y: finger1End.y },
+          { type: 'pointerUp', button: 0 },
+        ],
+      },
+      {
+        type: 'pointer', id: 'finger2', parameters: { pointerType: 'touch' },
+        actions: [
+          { type: 'pointerMove', duration: 0, x: finger2Start.x, y: finger2Start.y },
+          { type: 'pointerDown', button: 0 },
+          { type: 'pause', duration: 50 },
+          { type: 'pointerMove', duration, x: finger2End.x, y: finger2End.y },
+          { type: 'pointerUp', button: 0 },
+        ],
+      },
+    ] as any);
+
+    await this.driver.releaseActions();
+    await this.driver.pause(300);
+  }
+
+  /**
+   * Zoom gesture around a target point (zoom in)
+   */
+  private async zoom(
+    element?: UIElement,
+    coordinates?: { x: number; y: number }
+  ): Promise<void> {
+    const center = coordinates || (element ? this.observer.getElementCenter(element) : undefined);
+    if (!center) throw new Error('No target for zoom gesture');
+
+    const endOffset = 100; // pixels from center
+    const duration = 250;
+
+    const finger1Start = { x: center.x - 10, y: center.y };
+    const finger1End = { x: center.x - endOffset, y: center.y };
+    const finger2Start = { x: center.x + 10, y: center.y };
+    const finger2End = { x: center.x + endOffset, y: center.y };
+
+    await this.driver.performActions([
+      {
+        type: 'pointer', id: 'finger1', parameters: { pointerType: 'touch' },
+        actions: [
+          { type: 'pointerMove', duration: 0, x: finger1Start.x, y: finger1Start.y },
+          { type: 'pointerDown', button: 0 },
+          { type: 'pause', duration: 50 },
+          { type: 'pointerMove', duration, x: finger1End.x, y: finger1End.y },
+          { type: 'pointerUp', button: 0 },
+        ],
+      },
+      {
+        type: 'pointer', id: 'finger2', parameters: { pointerType: 'touch' },
+        actions: [
+          { type: 'pointerMove', duration: 0, x: finger2Start.x, y: finger2Start.y },
+          { type: 'pointerDown', button: 0 },
+          { type: 'pause', duration: 50 },
+          { type: 'pointerMove', duration, x: finger2End.x, y: finger2End.y },
+          { type: 'pointerUp', button: 0 },
+        ],
+      },
+    ] as any);
+
+    await this.driver.releaseActions();
+    await this.driver.pause(300);
+  }
+
+  /**
+   * Persist screenshot to artifacts directory if configured.
+   */
+  private maybePersistScreenshot(base64: string, phase: 'before' | 'after') {
+    try {
+      const dir = process.env.ARTIFACTS_DIR;
+      if (!dir) return;
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const idx = ++this.screenshotCounter;
+      const filePath = `${dir}/step_${idx}_${phase}.png`;
+      fs.writeFileSync(filePath, Buffer.from(base64, 'base64'));
+      this.testResult?.screenshots.push(filePath);
+    } catch {}
+  }
+}

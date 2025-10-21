@@ -1,0 +1,14 @@
+# Ignore non-CSS files to prevent false-positive CssSyntaxError
+**/*.ts
+**/*.tsx
+**/*.js
+**/*.jsx
+**/*.mjs
+**/*.cjs
+**/*.json
+**/*.md
+**/*.mdx
+
+# Build and deps
+node_modules/
+dist/

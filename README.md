@@ -221,6 +221,23 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 # Appium (optional)
 export APPIUM_HOST="localhost"
 export APPIUM_PORT="4723"
+## Optional advanced capabilities mapping
+# Android
+export MOBILE_APP_PACKAGE="com.example.app"
+export MOBILE_APP_ACTIVITY=".MainActivity"
+# iOS
+export MOBILE_BUNDLE_ID="com.example.App"
+# Common
+export MOBILE_APP_PATH="/path/to/app.apk_or_app"
+export MOBILE_DEVICE_NAME="Android Emulator"   # or iPhone 15
+export MOBILE_UDID="<device-udid>"
+export MOBILE_PLATFORM_VERSION="17.5"         # iOS only
+export APPIUM_AUTOMATION_NAME="UiAutomator2"  # or XCUITest
+export APPIUM_NO_RESET="false"
+export APPIUM_NEW_COMMAND_TIMEOUT="120"
+
+# Optional: save per-step screenshots
+export ARTIFACTS_DIR="./artifacts"
 ```
 
 ### Using Different LLM Providers
@@ -455,4 +472,3 @@ curl http://localhost:4723/status
 ---
 
 **Made with ❤️ for mobile test automation**
-
