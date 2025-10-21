@@ -12,8 +12,7 @@
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "prepublishOnly": "npm run build",
-    "mcp-server": "node ./bin/mcp-server.js",
-    "build:demo:android": "bash examples/scripts/build-demo-apk.sh"
+    "mcp-server": "node ./bin/mcp-server.js"
   },
   "keywords": [
     "mobile",

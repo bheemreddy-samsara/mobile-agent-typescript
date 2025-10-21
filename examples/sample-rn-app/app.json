@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Sample RN App",
+    "slug": "sample-rn-app",
+    "version": "0.0.1",
+    "scheme": "sample-rn-app",
+    "owner": null,
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "enabled": false
+    },
+    "ios": {
+      "bundleIdentifier": "com.sample.rnapp",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.sample.rnapp",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
+

@@ -83,28 +83,37 @@ cd examples
 npx ts-node basic-usage.ios.ts
 ```
 
-#### 2. Demo App APK (Android)
+#### 2. Sample React Native App (Android/iOS)
 
-If you have the Android native project under `examples/demo-app/android` (gradle wrapper present), you can build the APK via:
+Location: `examples/sample-rn-app`
 
-```bash
-npm run build:demo:android
-```
+This is a small React Native app (two screens: Login, Home) built with Expo tooling. It ships without native folders to keep the repo light; you can generate native projects on demand.
 
-The APK is expected at:
-
-```
-examples/demo-app/android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-Then run the connectivity test against the APK (no LLM required):
+Build Android APK:
 
 ```bash
-export MOBILE_APP_PATH="$PWD/examples/demo-app/android/app/build/outputs/apk/debug/app-debug.apk"
+cd examples/sample-rn-app
+npm install
+npm run prebuild:android     # generates android/ via Expo
+npm run build:android:apk    # or: bash ../scripts/build-sample-rn-android.sh
+```
+
+Then run connectivity:
+
+```bash
+export MOBILE_APP_PATH="$PWD/android/app/build/outputs/apk/debug/app-debug.apk"
+cd ../../..   # repo root
 npx ts-node examples/connectivity-android.ts
 ```
 
-If the Android project is not present, follow `examples/demo-app/README.md` for setup, or point `MOBILE_APP_PATH` to any existing APK.
+Run on iOS Simulator (build .app via Xcode):
+
+```bash
+cd examples/sample-rn-app
+npm install
+npm run prebuild:ios
+npm run ios          # opens Xcode/simulator; for Appium, build a Debug .app via Xcode
+```
 
 #### 3. Demo App Tests
 
@@ -128,7 +137,7 @@ cd ../..
 npm test -- examples/tests/demo-app/
 ```
 
-#### 4. Real App Tests
+#### 3. Real App Tests
 
 ```bash
 # Ensure the app is installed on your device/emulator
