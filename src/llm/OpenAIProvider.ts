@@ -2,15 +2,15 @@
  * OpenAI LLM Provider
  */
 
-import OpenAI from 'openai';
-import { BaseLLMProvider } from './LLMProvider';
-import { logger } from '../utils/logger';
+import OpenAI from "openai";
+import { logger } from "../utils/logger";
+import { BaseLLMProvider } from "./LLMProvider";
 
 export class OpenAIProvider extends BaseLLMProvider {
   private client: OpenAI;
   private model: string;
 
-  constructor(apiKey: string, model: string = 'gpt-4o') {
+  constructor(apiKey: string, model = "gpt-4o") {
     super();
     this.model = model;
     this.client = new OpenAI({ apiKey });
@@ -22,13 +22,13 @@ export class OpenAIProvider extends BaseLLMProvider {
 
     if (systemPrompt) {
       messages.push({
-        role: 'system',
+        role: "system",
         content: systemPrompt,
       });
     }
 
     messages.push({
-      role: 'user',
+      role: "user",
       content: prompt,
     });
 
@@ -42,35 +42,39 @@ export class OpenAIProvider extends BaseLLMProvider {
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
-        throw new Error('No content in OpenAI response');
+        throw new Error("No content in OpenAI response");
       }
 
       return content;
     } catch (error) {
-      logger.error('OpenAI query failed:', error);
+      logger.error("OpenAI query failed:", error);
       throw error;
     }
   }
 
-  async queryWithVision(prompt: string, imageBase64: string, systemPrompt?: string): Promise<string> {
+  async queryWithVision(
+    prompt: string,
+    imageBase64: string,
+    systemPrompt?: string,
+  ): Promise<string> {
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
     if (systemPrompt) {
       messages.push({
-        role: 'system',
+        role: "system",
         content: systemPrompt,
       });
     }
 
     messages.push({
-      role: 'user',
+      role: "user",
       content: [
         {
-          type: 'text',
+          type: "text",
           text: prompt,
         },
         {
-          type: 'image_url',
+          type: "image_url",
           image_url: {
             url: `data:image/png;base64,${imageBase64}`,
           },
@@ -88,14 +92,13 @@ export class OpenAIProvider extends BaseLLMProvider {
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
-        throw new Error('No content in OpenAI vision response');
+        throw new Error("No content in OpenAI vision response");
       }
 
       return content;
     } catch (error) {
-      logger.error('OpenAI vision query failed:', error);
+      logger.error("OpenAI vision query failed:", error);
       throw error;
     }
   }
 }
-

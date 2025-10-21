@@ -2,11 +2,11 @@
  * Test Helper Utilities
  */
 
-import { remote, Browser } from 'webdriverio';
-import { MobileAgent } from '../../../src';
+import { type Browser, remote } from "webdriverio";
+import { MobileAgent } from "../../../src";
 
 export interface TestConfig {
-  platform: 'Android' | 'iOS';
+  platform: "Android" | "iOS";
   appPath?: string;
   appPackage?: string;
   appActivity?: string;
@@ -21,36 +21,37 @@ export interface TestConfig {
 export async function initializeDriver(config: TestConfig): Promise<Browser> {
   const capabilities: any = {
     platformName: config.platform,
-    'appium:deviceName': config.deviceName || (config.platform === 'Android' ? 'Android Emulator' : 'iPhone 15 Pro'),
-    'appium:automationName': config.platform === 'Android' ? 'UiAutomator2' : 'XCUITest',
+    "appium:deviceName":
+      config.deviceName || (config.platform === "Android" ? "Android Emulator" : "iPhone 15 Pro"),
+    "appium:automationName": config.platform === "Android" ? "UiAutomator2" : "XCUITest",
   };
 
-  if (config.platform === 'Android') {
+  if (config.platform === "Android") {
     if (config.appPath) {
-      capabilities['appium:app'] = config.appPath;
+      capabilities["appium:app"] = config.appPath;
     }
     if (config.appPackage) {
-      capabilities['appium:appPackage'] = config.appPackage;
+      capabilities["appium:appPackage"] = config.appPackage;
     }
     if (config.appActivity) {
-      capabilities['appium:appActivity'] = config.appActivity;
+      capabilities["appium:appActivity"] = config.appActivity;
     }
   } else {
     if (config.appPath) {
-      capabilities['appium:app'] = config.appPath;
+      capabilities["appium:app"] = config.appPath;
     }
     if (config.bundleId) {
-      capabilities['appium:bundleId'] = config.bundleId;
+      capabilities["appium:bundleId"] = config.bundleId;
     }
     if (config.platformVersion) {
-      capabilities['appium:platformVersion'] = config.platformVersion;
+      capabilities["appium:platformVersion"] = config.platformVersion;
     }
   }
 
   const driver = await remote({
-    hostname: process.env.APPIUM_HOST || 'localhost',
-    port: parseInt(process.env.APPIUM_PORT || '4723', 10),
-    logLevel: 'warn',
+    hostname: process.env.APPIUM_HOST || "localhost",
+    port: parseInt(process.env.APPIUM_PORT || "4723", 10),
+    logLevel: "warn",
     capabilities,
   });
 
@@ -63,21 +64,23 @@ export async function initializeDriver(config: TestConfig): Promise<Browser> {
 export function initializeMobileAgent(
   driver: Browser,
   options: {
-    llmProvider?: 'openai' | 'anthropic';
+    llmProvider?: "openai" | "anthropic";
     enableVisionFallback?: boolean;
     verbose?: boolean;
-  } = {}
+  } = {},
 ): MobileAgent {
-  const apiKey = options.llmProvider === 'anthropic' 
-    ? process.env.ANTHROPIC_API_KEY!
-    : process.env.OPENAI_API_KEY!;
+  const apiKey =
+    options.llmProvider === "anthropic"
+      ? process.env.ANTHROPIC_API_KEY!
+      : process.env.OPENAI_API_KEY!;
 
   return new MobileAgent({
     driver,
     apiKey,
-    llmProvider: options.llmProvider || 'openai',
+    llmProvider: options.llmProvider || "openai",
     verbose: options.verbose !== undefined ? options.verbose : true,
-    enableVisionFallback: options.enableVisionFallback !== undefined ? options.enableVisionFallback : true,
+    enableVisionFallback:
+      options.enableVisionFallback !== undefined ? options.enableVisionFallback : true,
     visionConfig: {
       enabled: true,
       fallbackOnElementNotFound: true,
@@ -92,17 +95,13 @@ export function initializeMobileAgent(
  * Wait for a specified time
  */
 export async function wait(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
  * Retry a function multiple times
  */
-export async function retry<T>(
-  fn: () => Promise<T>,
-  maxAttempts: number = 3,
-  delayMs: number = 1000
-): Promise<T> {
+export async function retry<T>(fn: () => Promise<T>, maxAttempts = 3, delayMs = 1000): Promise<T> {
   let lastError: Error | undefined;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -117,6 +116,5 @@ export async function retry<T>(
     }
   }
 
-  throw lastError || new Error('All attempts failed');
+  throw lastError || new Error("All attempts failed");
 }
-

@@ -2,11 +2,11 @@
  * UI Observer - Observes and extracts UI state from the device
  */
 
-import { parseString } from 'xml2js';
-import type { Browser } from 'webdriverio';
-import { UIElement, UIState, UIElementType } from '../types';
-import { logger } from '../utils/logger';
-import { overlayNumericTags, overlayGridLines } from '../utils/imageProcessor';
+import type { Browser } from "webdriverio";
+import { parseString } from "xml2js";
+import { type UIElement, UIElementType, type UIState } from "../types";
+import { overlayGridLines, overlayNumericTags } from "../utils/imageProcessor";
+import { logger } from "../utils/logger";
 
 export class UIObserver {
   /**
@@ -14,8 +14,8 @@ export class UIObserver {
    */
   async getUIState(
     driver: Browser,
-    captureMode: 'none' | 'screenshot' | 'tagged' | 'grid' = 'none',
-    gridSize: number = 10
+    captureMode: "none" | "screenshot" | "tagged" | "grid" = "none",
+    gridSize = 10,
   ): Promise<UIState> {
     try {
       const pageSource = await driver.getPageSource();
@@ -33,33 +33,35 @@ export class UIObserver {
       };
 
       // Capture screenshot based on mode
-      if (captureMode !== 'none') {
+      if (captureMode !== "none") {
         const screenshotBase64 = await this.captureScreenshotAsBase64(driver);
         state.screenshotBase64 = screenshotBase64;
 
-        if (captureMode === 'tagged') {
+        if (captureMode === "tagged") {
           const { image, mapping } = await overlayNumericTags(screenshotBase64, elements);
           state.screenshotBase64 = image;
           state.tagMapping = mapping;
           logger.debug(`Tagged screenshot with ${mapping.size} elements`);
-        } else if (captureMode === 'grid') {
+        } else if (captureMode === "grid") {
           const windowSize = await driver.getWindowSize();
           const { image, gridMap, scaleFactor } = await overlayGridLines(
             screenshotBase64,
             gridSize,
             windowSize.width,
-            windowSize.height
+            windowSize.height,
           );
           state.screenshotBase64 = image;
-          state.gridMap = gridMap;  // Already scaled to logical coordinates
-          logger.debug(`Created grid overlay with ${gridMap.size} cells (scale: ${scaleFactor.x.toFixed(2)}x${scaleFactor.y.toFixed(2)})`);
+          state.gridMap = gridMap; // Already scaled to logical coordinates
+          logger.debug(
+            `Created grid overlay with ${gridMap.size} cells (scale: ${scaleFactor.x.toFixed(2)}x${scaleFactor.y.toFixed(2)})`,
+          );
         }
       }
 
       logger.debug(`Current state: ${activity}, ${elements.length} elements`);
       return state;
     } catch (error) {
-      logger.error('Failed to get UI state:', error);
+      logger.error("Failed to get UI state:", error);
       throw error;
     }
   }
@@ -72,7 +74,7 @@ export class UIObserver {
       const screenshot = await driver.takeScreenshot();
       return screenshot;
     } catch (error) {
-      logger.error('Failed to capture screenshot:', error);
+      logger.error("Failed to capture screenshot:", error);
       throw error;
     }
   }
@@ -82,7 +84,7 @@ export class UIObserver {
    */
   async captureScreenshotWithTags(
     driver: Browser,
-    elements: UIElement[]
+    elements: UIElement[],
   ): Promise<{ screenshot: string; tagMapping: Map<number, UIElement> }> {
     try {
       const screenshotBase64 = await this.captureScreenshotAsBase64(driver);
@@ -92,7 +94,7 @@ export class UIObserver {
         tagMapping: result.mapping,
       };
     } catch (error) {
-      logger.error('Failed to capture tagged screenshot:', error);
+      logger.error("Failed to capture tagged screenshot:", error);
       throw error;
     }
   }
@@ -102,7 +104,7 @@ export class UIObserver {
    */
   async generateGridOverlay(
     driver: Browser,
-    gridSize: number = 10
+    gridSize = 10,
   ): Promise<{ screenshot: string; gridMap: Map<string, { x: number; y: number }> }> {
     try {
       const screenshotBase64 = await this.captureScreenshotAsBase64(driver);
@@ -110,15 +112,15 @@ export class UIObserver {
       const result = await overlayGridLines(
         screenshotBase64,
         gridSize,
-        windowSize.width,  // Logical width
-        windowSize.height  // Logical height
+        windowSize.width, // Logical width
+        windowSize.height, // Logical height
       );
       return {
         screenshot: result.image,
-        gridMap: result.gridMap,  // Already in logical coordinates
+        gridMap: result.gridMap, // Already in logical coordinates
       };
     } catch (error) {
-      logger.error('Failed to generate grid overlay:', error);
+      logger.error("Failed to generate grid overlay:", error);
       throw error;
     }
   }
@@ -146,9 +148,11 @@ export class UIObserver {
 
         // Recursively process children
         for (const key in node) {
-          if (key !== '$' && key !== '_') {
+          if (key !== "$" && key !== "_") {
             const children = Array.isArray(node[key]) ? node[key] : [node[key]];
-            children.forEach((child) => traverse(child));
+            for (const child of children) {
+              traverse(child);
+            }
           }
         }
       };
@@ -157,16 +161,18 @@ export class UIObserver {
       const root = parsedXml.hierarchy || parsedXml;
       if (root) {
         for (const key in root) {
-          if (key !== '$') {
+          if (key !== "$") {
             const nodes = Array.isArray(root[key]) ? root[key] : [root[key]];
-            nodes.forEach((node) => traverse(node));
+            for (const nodeItem of nodes) {
+              traverse(nodeItem);
+            }
           }
         }
       }
 
       return elements;
     } catch (error) {
-      logger.error('Failed to parse XML:', error);
+      logger.error("Failed to parse XML:", error);
       return elements;
     }
   }
@@ -187,29 +193,27 @@ export class UIObserver {
    * Parse a single UI element from XML attributes
    */
   private parseElement(attribs: any, elementId: string): UIElement {
-    if (!attribs) {
-      attribs = {};
-    }
+    const attrs = attribs ?? {};
 
-    const className = attribs.class || '';
+    const className = attrs.class || "";
     const elementType = this.inferElementType(className);
-    const bounds = this.parseBounds(attribs.bounds || '');
+    const bounds = this.parseBounds(attrs.bounds || "");
 
     return {
       elementId,
-      text: attribs.text || '',
-      resourceId: attribs['resource-id'] || undefined,
+      text: attrs.text || "",
+      resourceId: attrs["resource-id"] || undefined,
       className,
-      contentDesc: attribs['content-desc'] || undefined,
+      contentDesc: attrs["content-desc"] || undefined,
       bounds,
       elementType,
-      clickable: attribs.clickable === 'true',
-      scrollable: attribs.scrollable === 'true',
-      focusable: attribs.focusable === 'true',
-      longClickable: attribs['long-clickable'] === 'true',
-      checked: attribs.checked === 'true',
-      enabled: attribs.enabled !== 'false',
-      visible: attribs.visible !== 'false',
+      clickable: attrs.clickable === "true",
+      scrollable: attrs.scrollable === "true",
+      focusable: attrs.focusable === "true",
+      longClickable: attrs["long-clickable"] === "true",
+      checked: attrs.checked === "true",
+      enabled: attrs.enabled !== "false",
+      visible: attrs.visible !== "false",
     };
   }
 
@@ -219,16 +223,16 @@ export class UIObserver {
   private inferElementType(className: string): UIElementType {
     const lower = className.toLowerCase();
 
-    if (lower.includes('button')) return UIElementType.BUTTON;
-    if (lower.includes('edittext') || lower.includes('edit')) return UIElementType.EDIT_TEXT;
-    if (lower.includes('textview') || lower.includes('text')) return UIElementType.TEXT_VIEW;
-    if (lower.includes('imageview') || lower.includes('image')) return UIElementType.IMAGE_VIEW;
-    if (lower.includes('listview')) return UIElementType.LIST_VIEW;
-    if (lower.includes('recyclerview')) return UIElementType.RECYCLER_VIEW;
-    if (lower.includes('webview')) return UIElementType.WEBVIEW;
-    if (lower.includes('dialog') || lower.includes('alertdialog')) return UIElementType.DIALOG;
-    if (lower.includes('toggle') || lower.includes('switch')) return UIElementType.TOGGLE;
-    if (lower.includes('spinner')) return UIElementType.SPINNER;
+    if (lower.includes("button")) return UIElementType.BUTTON;
+    if (lower.includes("edittext") || lower.includes("edit")) return UIElementType.EDIT_TEXT;
+    if (lower.includes("textview") || lower.includes("text")) return UIElementType.TEXT_VIEW;
+    if (lower.includes("imageview") || lower.includes("image")) return UIElementType.IMAGE_VIEW;
+    if (lower.includes("listview")) return UIElementType.LIST_VIEW;
+    if (lower.includes("recyclerview")) return UIElementType.RECYCLER_VIEW;
+    if (lower.includes("webview")) return UIElementType.WEBVIEW;
+    if (lower.includes("dialog") || lower.includes("alertdialog")) return UIElementType.DIALOG;
+    if (lower.includes("toggle") || lower.includes("switch")) return UIElementType.TOGGLE;
+    if (lower.includes("spinner")) return UIElementType.SPINNER;
 
     return UIElementType.UNKNOWN;
   }
@@ -236,19 +240,21 @@ export class UIObserver {
   /**
    * Parse bounds string like '[100,200][300,400]'
    */
-  private parseBounds(boundsStr: string): { x1: number; y1: number; x2: number; y2: number } | undefined {
+  private parseBounds(
+    boundsStr: string,
+  ): { x1: number; y1: number; x2: number; y2: number } | undefined {
     try {
       // Format: [x1,y1][x2,y2]
-      const parts = boundsStr.replace(/\]\[/g, ',').replace(/[\[\]]/g, '').split(',');
+      const parts = boundsStr.replace(/\]\[/g, ",").replace(/[[\]]/g, "").split(",");
       if (parts.length === 4) {
         return {
-          x1: parseInt(parts[0], 10),
-          y1: parseInt(parts[1], 10),
-          x2: parseInt(parts[2], 10),
-          y2: parseInt(parts[3], 10),
+          x1: Number.parseInt(parts[0], 10),
+          y1: Number.parseInt(parts[1], 10),
+          x2: Number.parseInt(parts[2], 10),
+          y2: Number.parseInt(parts[3], 10),
         };
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore parsing errors
     }
     return undefined;
@@ -261,8 +267,8 @@ export class UIObserver {
     try {
       return await driver.getCurrentActivity();
     } catch (error) {
-      logger.warn('Failed to get current activity:', error);
-      return 'Unknown';
+      logger.warn("Failed to get current activity:", error);
+      return "Unknown";
     }
   }
 
@@ -273,12 +279,12 @@ export class UIObserver {
     try {
       const capabilities: any = driver.capabilities;
       return {
-        platform: capabilities.platformName || capabilities['appium:platformName'],
-        platformVersion: capabilities.platformVersion || capabilities['appium:platformVersion'],
-        deviceName: capabilities.deviceName || capabilities['appium:deviceName'],
+        platform: capabilities.platformName || capabilities["appium:platformName"],
+        platformVersion: capabilities.platformVersion || capabilities["appium:platformVersion"],
+        deviceName: capabilities.deviceName || capabilities["appium:deviceName"],
       };
     } catch (error) {
-      logger.warn('Failed to get device info:', error);
+      logger.warn("Failed to get device info:", error);
       return {};
     }
   }
@@ -302,14 +308,13 @@ export class UIObserver {
    */
   findElementByText(elements: UIElement[], text: string): UIElement | undefined {
     const textLower = text.toLowerCase();
-    return elements.find((e) => e.text && e.text.toLowerCase().includes(textLower));
+    return elements.find((e) => e.text?.toLowerCase().includes(textLower));
   }
 
   /**
    * Find element by resource ID
    */
   findElementById(elements: UIElement[], resourceId: string): UIElement | undefined {
-    return elements.find((e) => e.resourceId && e.resourceId.includes(resourceId));
+    return elements.find((e) => e.resourceId?.includes(resourceId));
   }
 }
-

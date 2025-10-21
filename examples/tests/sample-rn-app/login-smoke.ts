@@ -8,23 +8,23 @@
  *   export MOBILE_APP_PATH="$PWD/examples/sample-rn-app/android/app/build/outputs/apk/release/app-release.apk"
  *   npx ts-node examples/tests/sample-rn-app/login-smoke.ts
  */
-import { remote } from 'webdriverio';
+import { remote } from "webdriverio";
 
 async function run() {
   const apk = process.env.MOBILE_APP_PATH;
-  if (!apk) throw new Error('Set MOBILE_APP_PATH to your sample RN app APK');
+  if (!apk) throw new Error("Set MOBILE_APP_PATH to your sample RN app APK");
 
   const driver = await remote({
-    hostname: process.env.APPIUM_HOST || 'localhost',
-    port: parseInt(process.env.APPIUM_PORT || '4723', 10),
-    logLevel: 'info',
+    hostname: process.env.APPIUM_HOST || "localhost",
+    port: parseInt(process.env.APPIUM_PORT || "4723", 10),
+    logLevel: "info",
     capabilities: {
-      platformName: 'Android',
-      'appium:automationName': 'UiAutomator2',
-      'appium:deviceName': process.env.MOBILE_DEVICE_NAME || 'Android Emulator',
-      'appium:app': apk,
-      'appium:noReset': true,
-      'appium:newCommandTimeout': 120,
+      platformName: "Android",
+      "appium:automationName": "UiAutomator2",
+      "appium:deviceName": process.env.MOBILE_DEVICE_NAME || "Android Emulator",
+      "appium:app": apk,
+      "appium:noReset": true,
+      "appium:newCommandTimeout": 120,
     },
   });
 
@@ -33,9 +33,13 @@ async function run() {
     await driver.pause(1500);
 
     // If RN RedBox is present, fail fast with a helpful hint
-    const redbox = await driver.$$(`android=new UiSelector().resourceIdMatches(".*rn_redbox_stack")`);
+    const redbox = await driver.$$(
+      `android=new UiSelector().resourceIdMatches(".*rn_redbox_stack")`,
+    );
     if (redbox.length > 0) {
-      throw new Error("React Native RedBox detected. Start Metro with 'npx react-native start' or ensure the bundle is embedded.");
+      throw new Error(
+        "React Native RedBox detected. Start Metro with 'npx react-native start' or ensure the bundle is embedded.",
+      );
     }
 
     // Try to find the login button by accessibility id first
@@ -57,10 +61,12 @@ async function run() {
     // Verify Home screen
     let ok = false;
     try {
-      const logout = await driver.$('~logout-button');
+      const logout = await driver.$("~logout-button");
       await logout.waitForExist({ timeout: 5000 });
       ok = true;
-    } catch {}
+    } catch {
+      /* not on Home yet */
+    }
 
     // Fallback: find text "Home"
     if (!ok) {
@@ -69,15 +75,15 @@ async function run() {
       ok = true;
     }
 
-    if (!ok) throw new Error('Home screen not detected');
+    if (!ok) throw new Error("Home screen not detected");
 
-    console.log('✅ Sample RN login smoke passed');
+    console.log("✅ Sample RN login smoke passed");
   } finally {
     await driver.deleteSession();
   }
 }
 
 run().catch((e) => {
-  console.error('❌ Sample RN login smoke failed:', e);
+  console.error("❌ Sample RN login smoke failed:", e);
   process.exit(1);
 });

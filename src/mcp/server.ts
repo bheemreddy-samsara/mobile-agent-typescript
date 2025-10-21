@@ -1,22 +1,19 @@
 /**
  * MCP Server Implementation for Mobile Agent
- * 
+ *
  * Exposes Mobile Agent SDK functionality via Model Context Protocol,
  * enabling agent-based workflows with Claude Desktop, Cursor, and other MCP clients.
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-import { MobileAgent } from '../MobileAgent.js';
-import { MOBILE_AGENT_TOOLS } from './tools.js';
-import { logger, LogLevel } from '../utils/logger.js';
-import type { Browser } from 'webdriverio';
-import { remote } from 'webdriverio';
-import * as fs from 'fs';
+import * as fs from "node:fs";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import type { Browser } from "webdriverio";
+import { remote } from "webdriverio";
+import { MobileAgent } from "../MobileAgent.js";
+import { logger } from "../utils/logger.js";
+import { MOBILE_AGENT_TOOLS } from "./tools.js";
 
 /**
  * MCP Server for Mobile Agent
@@ -25,19 +22,19 @@ export class MobileAgentMCPServer {
   private server: Server;
   private agent: MobileAgent | null = null;
   private driver: Browser | null = null;
-  private sessionActive: boolean = false;
+  private sessionActive = false;
 
   constructor() {
     this.server = new Server(
       {
-        name: 'mobile-agent',
-        version: '1.0.0',
+        name: "mobile-agent",
+        version: "1.0.0",
       },
       {
         capabilities: {
           tools: {},
         },
-      }
+      },
     );
 
     this.setupHandlers();
@@ -50,7 +47,7 @@ export class MobileAgentMCPServer {
   private setupHandlers(): void {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: MOBILE_AGENT_TOOLS.map(tool => ({
+      tools: MOBILE_AGENT_TOOLS.map((tool) => ({
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema,
@@ -63,25 +60,25 @@ export class MobileAgentMCPServer {
 
       try {
         switch (name) {
-          case 'mobile_start_session':
+          case "mobile_start_session":
             return await this.handleStartSession();
 
-          case 'mobile_stop_session':
-            return await this.handleStopSession(args as { status: 'success' | 'failure' });
+          case "mobile_stop_session":
+            return await this.handleStopSession(args as { status: "success" | "failure" });
 
-          case 'mobile_execute':
+          case "mobile_execute":
             return await this.handleExecute(args as { instruction: string; visionMode?: string });
 
-          case 'mobile_assert':
+          case "mobile_assert":
             return await this.handleAssert(args as { condition: string });
 
-          case 'mobile_take_screenshot':
+          case "mobile_take_screenshot":
             return await this.handleTakeScreenshot(args as { saveToFile?: string });
 
-          case 'mobile_get_state':
+          case "mobile_get_state":
             return await this.handleGetState(args as { includeScreenshot?: boolean });
 
-          case 'mobile_configure':
+          case "mobile_configure":
             return await this.handleConfigure(args as any);
 
           default:
@@ -92,7 +89,7 @@ export class MobileAgentMCPServer {
         return {
           content: [
             {
-              type: 'text',
+              type: "text",
               text: `Error: ${error.message}`,
             },
           ],
@@ -107,10 +104,10 @@ export class MobileAgentMCPServer {
    */
   private setupErrorHandling(): void {
     this.server.onerror = (error) => {
-      logger.error('MCP Server error:', error);
+      logger.error("MCP Server error:", error);
     };
 
-    process.on('SIGINT', async () => {
+    process.on("SIGINT", async () => {
       await this.cleanup();
       process.exit(0);
     });
@@ -125,52 +122,64 @@ export class MobileAgentMCPServer {
     }
 
     // Get configuration from environment variables
-    const platform = (process.env.MOBILE_PLATFORM || 'Android') as 'Android' | 'iOS';
+    const platform = (process.env.MOBILE_PLATFORM || "Android") as "Android" | "iOS";
     const apiKey = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-    const llmProvider = process.env.LLM_PROVIDER || 'openai';
+    const llmProvider = process.env.LLM_PROVIDER || "openai";
 
     if (!apiKey) {
-      throw new Error('API key not found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable.');
+      throw new Error(
+        "API key not found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable.",
+      );
     }
 
     // Build capabilities from env
     const caps: any = {
       platformName: platform,
-      'appium:automationName': process.env.APPIUM_AUTOMATION_NAME || (platform === 'iOS' ? 'XCUITest' : 'UiAutomator2'),
-      'appium:noReset': process.env.APPIUM_NO_RESET === 'true',
-      'appium:newCommandTimeout': parseInt(process.env.APPIUM_NEW_COMMAND_TIMEOUT || '120'),
+      "appium:automationName":
+        process.env.APPIUM_AUTOMATION_NAME || (platform === "iOS" ? "XCUITest" : "UiAutomator2"),
+      "appium:noReset": process.env.APPIUM_NO_RESET === "true",
+      "appium:newCommandTimeout": Number.parseInt(
+        process.env.APPIUM_NEW_COMMAND_TIMEOUT || "120",
+        10,
+      ),
     };
 
-    if (platform === 'Android') {
-      if (process.env.MOBILE_APP_PACKAGE) caps['appium:appPackage'] = process.env.MOBILE_APP_PACKAGE;
-      if (process.env.MOBILE_APP_ACTIVITY) caps['appium:appActivity'] = process.env.MOBILE_APP_ACTIVITY;
-      if (process.env.MOBILE_DEVICE_NAME) caps['appium:deviceName'] = process.env.MOBILE_DEVICE_NAME;
-      if (process.env.MOBILE_UDID) caps['appium:udid'] = process.env.MOBILE_UDID;
+    if (platform === "Android") {
+      if (process.env.MOBILE_APP_PACKAGE)
+        caps["appium:appPackage"] = process.env.MOBILE_APP_PACKAGE;
+      if (process.env.MOBILE_APP_ACTIVITY)
+        caps["appium:appActivity"] = process.env.MOBILE_APP_ACTIVITY;
+      if (process.env.MOBILE_DEVICE_NAME)
+        caps["appium:deviceName"] = process.env.MOBILE_DEVICE_NAME;
+      if (process.env.MOBILE_UDID) caps["appium:udid"] = process.env.MOBILE_UDID;
     } else {
-      if (process.env.MOBILE_BUNDLE_ID) caps['appium:bundleId'] = process.env.MOBILE_BUNDLE_ID;
-      if (process.env.MOBILE_DEVICE_NAME) caps['appium:deviceName'] = process.env.MOBILE_DEVICE_NAME;
-      if (process.env.MOBILE_UDID) caps['appium:udid'] = process.env.MOBILE_UDID;
-      if (process.env.MOBILE_PLATFORM_VERSION) caps['appium:platformVersion'] = process.env.MOBILE_PLATFORM_VERSION;
+      if (process.env.MOBILE_BUNDLE_ID) caps["appium:bundleId"] = process.env.MOBILE_BUNDLE_ID;
+      if (process.env.MOBILE_DEVICE_NAME)
+        caps["appium:deviceName"] = process.env.MOBILE_DEVICE_NAME;
+      if (process.env.MOBILE_UDID) caps["appium:udid"] = process.env.MOBILE_UDID;
+      if (process.env.MOBILE_PLATFORM_VERSION)
+        caps["appium:platformVersion"] = process.env.MOBILE_PLATFORM_VERSION;
     }
 
     // App path (optional; can be used for both Android and iOS)
-    if (process.env.MOBILE_APP_PATH) caps['appium:app'] = process.env.MOBILE_APP_PATH;
+    if (process.env.MOBILE_APP_PATH) caps["appium:app"] = process.env.MOBILE_APP_PATH;
 
     // Minimal validation: require either app id (package/bundleId) or app path
-    const hasAppId = platform === 'Android' ? !!caps['appium:appPackage'] : !!caps['appium:bundleId'];
-    const hasAppPath = !!caps['appium:app'];
+    const hasAppId =
+      platform === "Android" ? !!caps["appium:appPackage"] : !!caps["appium:bundleId"];
+    const hasAppPath = !!caps["appium:app"];
     if (!hasAppId && !hasAppPath) {
       throw new Error(
-        platform === 'Android'
-          ? 'Missing MOBILE_APP_PACKAGE or MOBILE_APP_PATH for Android.'
-          : 'Missing MOBILE_BUNDLE_ID or MOBILE_APP_PATH for iOS.'
+        platform === "Android"
+          ? "Missing MOBILE_APP_PACKAGE or MOBILE_APP_PATH for Android."
+          : "Missing MOBILE_BUNDLE_ID or MOBILE_APP_PATH for iOS.",
       );
     }
 
     // Initialize WebDriverIO
     this.driver = await remote({
-      hostname: process.env.APPIUM_HOST || 'localhost',
-      port: parseInt(process.env.APPIUM_PORT || '4723'),
+      hostname: process.env.APPIUM_HOST || "localhost",
+      port: Number.parseInt(process.env.APPIUM_PORT || "4723", 10),
       capabilities: caps,
     });
 
@@ -178,11 +187,11 @@ export class MobileAgentMCPServer {
     this.agent = new MobileAgent({
       driver: this.driver,
       apiKey,
-      llmProvider: llmProvider as 'openai' | 'anthropic',
-      verbose: process.env.VERBOSE === 'true',
+      llmProvider: llmProvider as "openai" | "anthropic",
+      verbose: process.env.VERBOSE === "true",
     });
 
-    logger.info('Mobile Agent MCP Server initialized');
+    logger.info("Mobile Agent MCP Server initialized");
   }
 
   /**
@@ -192,7 +201,7 @@ export class MobileAgentMCPServer {
     await this.initialize();
 
     if (!this.agent) {
-      throw new Error('Agent not initialized');
+      throw new Error("Agent not initialized");
     }
 
     await this.agent.startSession();
@@ -201,8 +210,8 @@ export class MobileAgentMCPServer {
     return {
       content: [
         {
-          type: 'text',
-          text: 'Mobile testing session started successfully',
+          type: "text",
+          text: "Mobile testing session started successfully",
         },
       ],
     };
@@ -211,9 +220,9 @@ export class MobileAgentMCPServer {
   /**
    * Handle mobile_stop_session
    */
-  private async handleStopSession(args: { status: 'success' | 'failure' }) {
+  private async handleStopSession(args: { status: "success" | "failure" }) {
     if (!this.agent || !this.sessionActive) {
-      throw new Error('No active session');
+      throw new Error("No active session");
     }
 
     const result = await this.agent.stopSession(args.status);
@@ -222,7 +231,7 @@ export class MobileAgentMCPServer {
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: JSON.stringify(result, null, 2),
         },
       ],
@@ -234,13 +243,13 @@ export class MobileAgentMCPServer {
    */
   private async handleExecute(args: { instruction: string; visionMode?: string }) {
     if (!this.agent || !this.sessionActive) {
-      throw new Error('Session not started. Call mobile_start_session first.');
+      throw new Error("Session not started. Call mobile_start_session first.");
     }
 
     // Apply vision mode if specified
-    if (args.visionMode === 'pure-vision-only') {
+    if (args.visionMode === "pure-vision-only") {
       (this.agent as any).visionConfig.pureVisionOnly = true;
-    } else if (args.visionMode === 'auto') {
+    } else if (args.visionMode === "auto") {
       (this.agent as any).visionConfig.pureVisionOnly = false;
     }
 
@@ -249,7 +258,7 @@ export class MobileAgentMCPServer {
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: `Successfully executed: "${args.instruction}"`,
         },
       ],
@@ -261,7 +270,7 @@ export class MobileAgentMCPServer {
    */
   private async handleAssert(args: { condition: string }) {
     if (!this.agent || !this.sessionActive) {
-      throw new Error('Session not started. Call mobile_start_session first.');
+      throw new Error("Session not started. Call mobile_start_session first.");
     }
 
     const passed = await this.agent.assert(args.condition);
@@ -269,8 +278,8 @@ export class MobileAgentMCPServer {
     return {
       content: [
         {
-          type: 'text',
-          text: passed 
+          type: "text",
+          text: passed
             ? `✅ Assertion passed: "${args.condition}"`
             : `❌ Assertion failed: "${args.condition}"`,
         },
@@ -283,18 +292,18 @@ export class MobileAgentMCPServer {
    */
   private async handleTakeScreenshot(args: { saveToFile?: string }) {
     if (!this.driver) {
-      throw new Error('Driver not initialized');
+      throw new Error("Driver not initialized");
     }
 
     const screenshot = await this.driver.takeScreenshot();
 
     if (args.saveToFile) {
-      const buffer = Buffer.from(screenshot, 'base64');
+      const buffer = Buffer.from(screenshot, "base64");
       fs.writeFileSync(args.saveToFile, buffer);
       return {
         content: [
           {
-            type: 'text',
+            type: "text",
             text: `Screenshot saved to: ${args.saveToFile}`,
           },
         ],
@@ -304,9 +313,9 @@ export class MobileAgentMCPServer {
     return {
       content: [
         {
-          type: 'image',
+          type: "image",
           data: screenshot,
-          mimeType: 'image/png',
+          mimeType: "image/png",
         },
       ],
     };
@@ -317,13 +326,13 @@ export class MobileAgentMCPServer {
    */
   private async handleGetState(args: { includeScreenshot?: boolean }) {
     if (!this.agent || !this.sessionActive) {
-      throw new Error('Session not started');
+      throw new Error("Session not started");
     }
 
     const state = (this.agent as any).currentState;
-    
+
     if (!state) {
-      throw new Error('No current state available');
+      throw new Error("No current state available");
     }
 
     const stateInfo = {
@@ -341,16 +350,16 @@ export class MobileAgentMCPServer {
 
     const content: any[] = [
       {
-        type: 'text',
+        type: "text",
         text: JSON.stringify(stateInfo, null, 2),
       },
     ];
 
     if (args.includeScreenshot && state.screenshotBase64) {
       content.push({
-        type: 'image',
+        type: "image",
         data: state.screenshotBase64,
-        mimeType: 'image/png',
+        mimeType: "image/png",
       });
     }
 
@@ -362,24 +371,24 @@ export class MobileAgentMCPServer {
    */
   private async handleConfigure(args: any) {
     if (!this.agent) {
-      throw new Error('Agent not initialized');
+      throw new Error("Agent not initialized");
     }
 
     // Update configuration
     const visionConfig = (this.agent as any).visionConfig;
-    
+
     if (args.enableVisionFallback !== undefined) {
       visionConfig.enabled = args.enableVisionFallback;
     }
-    
+
     if (args.confidenceThreshold !== undefined) {
       visionConfig.confidenceThreshold = args.confidenceThreshold;
     }
-    
+
     if (args.pureVisionOnly !== undefined) {
       visionConfig.pureVisionOnly = args.pureVisionOnly;
     }
-    
+
     if (args.gridSize !== undefined) {
       visionConfig.gridSize = args.gridSize;
     }
@@ -387,7 +396,7 @@ export class MobileAgentMCPServer {
     return {
       content: [
         {
-          type: 'text',
+          type: "text",
           text: `Configuration updated: ${JSON.stringify(args, null, 2)}`,
         },
       ],
@@ -400,13 +409,13 @@ export class MobileAgentMCPServer {
   private async cleanup(): Promise<void> {
     try {
       if (this.sessionActive && this.agent) {
-        await this.agent.stopSession('failure');
+        await this.agent.stopSession("failure");
       }
       if (this.driver) {
         await this.driver.deleteSession();
       }
     } catch (error) {
-      logger.error('Cleanup error:', error);
+      logger.error("Cleanup error:", error);
     }
   }
 
@@ -416,7 +425,7 @@ export class MobileAgentMCPServer {
   async run(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    logger.info('Mobile Agent MCP Server running on stdio');
+    logger.info("Mobile Agent MCP Server running on stdio");
   }
 }
 
@@ -426,7 +435,7 @@ export class MobileAgentMCPServer {
 if (require.main === module) {
   const server = new MobileAgentMCPServer();
   server.run().catch((error) => {
-    logger.error('Failed to start MCP server:', error);
+    logger.error("Failed to start MCP server:", error);
     process.exit(1);
   });
 }

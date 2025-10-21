@@ -2,58 +2,58 @@
  * Type definitions for Mobile Agent SDK
  */
 
-import type { Browser } from 'webdriverio';
+import type { Browser } from "webdriverio";
 
 /**
  * Types of actions that can be performed on UI
  */
 export enum ActionType {
-  CLICK = 'click',
-  LONG_PRESS = 'long_press',
-  SWIPE = 'swipe',
-  SCROLL = 'scroll',
-  TYPE_TEXT = 'type_text',
-  TAP = 'tap',
-  DOUBLE_TAP = 'double_tap',
-  PINCH = 'pinch',
-  ZOOM = 'zoom',
+  CLICK = "click",
+  LONG_PRESS = "long_press",
+  SWIPE = "swipe",
+  SCROLL = "scroll",
+  TYPE_TEXT = "type_text",
+  TAP = "tap",
+  DOUBLE_TAP = "double_tap",
+  PINCH = "pinch",
+  ZOOM = "zoom",
 }
 
 /**
  * Vision-based detection methods
  */
 export enum VisionMethod {
-  HIERARCHY = 'hierarchy',
-  VISION_TAGGING = 'vision-tagging',
-  GRID_OVERLAY = 'grid-overlay',
-  PURE_VISION = 'pure-vision',
+  HIERARCHY = "hierarchy",
+  VISION_TAGGING = "vision-tagging",
+  GRID_OVERLAY = "grid-overlay",
+  PURE_VISION = "pure-vision",
 }
 
 /**
  * Types of UI elements
  */
 export enum UIElementType {
-  BUTTON = 'button',
-  TEXT_VIEW = 'text_view',
-  EDIT_TEXT = 'edit_text',
-  IMAGE_VIEW = 'image_view',
-  LIST_VIEW = 'list_view',
-  RECYCLER_VIEW = 'recycler_view',
-  WEBVIEW = 'webview',
-  DIALOG = 'dialog',
-  TOGGLE = 'toggle',
-  SPINNER = 'spinner',
-  UNKNOWN = 'unknown',
+  BUTTON = "button",
+  TEXT_VIEW = "text_view",
+  EDIT_TEXT = "edit_text",
+  IMAGE_VIEW = "image_view",
+  LIST_VIEW = "list_view",
+  RECYCLER_VIEW = "recycler_view",
+  WEBVIEW = "webview",
+  DIALOG = "dialog",
+  TOGGLE = "toggle",
+  SPINNER = "spinner",
+  UNKNOWN = "unknown",
 }
 
 /**
  * Verification result statuses
  */
 export enum VerificationStatus {
-  PASSED = 'passed',
-  FAILED = 'failed',
-  SKIPPED = 'skipped',
-  ERROR = 'error',
+  PASSED = "passed",
+  FAILED = "failed",
+  SKIPPED = "skipped",
+  ERROR = "error",
 }
 
 /**
@@ -164,7 +164,7 @@ export interface VisionFallbackConfig {
   alwaysUseVision?: boolean;
   preferredMethod?: VisionMethod;
   pureVisionConfig?: PureVisionConfig;
-  pureVisionOnly?: boolean;  // Skip tiers 1-3, use only pure vision
+  pureVisionOnly?: boolean; // Skip tiers 1-3, use only pure vision
 }
 
 /**
@@ -173,7 +173,7 @@ export interface VisionFallbackConfig {
 export interface MobileAgentConfig {
   driver: Browser;
   apiKey: string;
-  llmProvider?: 'openai' | 'anthropic';
+  llmProvider?: "openai" | "anthropic";
   model?: string;
   maxSteps?: number;
   timeoutSeconds?: number;
@@ -189,14 +189,14 @@ export interface LLMActionResponse {
   action: string;
   elementId?: string;
   coordinates?: { x: number; y: number };
-  location?: { x_percent: number; y_percent: number };  // For pure vision percentage-based coords
+  location?: { x_percent: number; y_percent: number }; // For pure vision percentage-based coords
   parameters?: Record<string, any>;
   reasoning: string;
   confidence?: number;
   method?: VisionMethod;
   tagId?: number;
   gridPosition?: string;
-  element?: string;  // Element description for pure vision
+  element?: string; // Element description for pure vision
 }
 
 /**
@@ -211,4 +211,3 @@ export interface LLMVerificationResponse {
   issues?: string[];
   confidence: number;
 }
-

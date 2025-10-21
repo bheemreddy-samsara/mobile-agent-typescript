@@ -2,24 +2,24 @@
  * Image Processing Utilities for Vision-Based Fallback
  */
 
-import sharp from 'sharp';
-import { UIElement } from '../types';
-import { logger } from './logger';
+import sharp from "sharp";
+import type { UIElement } from "../types";
+import { logger } from "./logger";
 
 /**
  * Convert base64 string to Buffer
  */
 export function base64ToBuffer(base64: string): Buffer {
   // Remove data URL prefix if present
-  const base64Data = base64.replace(/^data:image\/\w+;base64,/, '');
-  return Buffer.from(base64Data, 'base64');
+  const base64Data = base64.replace(/^data:image\/\w+;base64,/, "");
+  return Buffer.from(base64Data, "base64");
 }
 
 /**
  * Convert Buffer to base64 string
  */
 export function bufferToBase64(buffer: Buffer): string {
-  return buffer.toString('base64');
+  return buffer.toString("base64");
 }
 
 /**
@@ -27,25 +27,23 @@ export function bufferToBase64(buffer: Buffer): string {
  */
 export async function overlayNumericTags(
   base64Image: string,
-  elements: UIElement[]
+  elements: UIElement[],
 ): Promise<{ image: string; mapping: Map<number, UIElement> }> {
   try {
     const imageBuffer = base64ToBuffer(base64Image);
     const image = sharp(imageBuffer);
     const metadata = await image.metadata();
-    
+
     if (!metadata.width || !metadata.height) {
-      throw new Error('Failed to get image dimensions');
+      throw new Error("Failed to get image dimensions");
     }
 
     const mapping = new Map<number, UIElement>();
-    const clickableElements = elements.filter(
-      (e) => e.clickable && e.visible && e.bounds
-    );
+    const clickableElements = elements.filter((e) => e.clickable && e.visible && e.bounds);
 
     // Create SVG overlay with numbered tags
     const svgElements: string[] = [];
-    
+
     clickableElements.forEach((element, index) => {
       const tagId = index + 1;
       mapping.set(tagId, element);
@@ -53,7 +51,7 @@ export async function overlayNumericTags(
       if (element.bounds) {
         const centerX = Math.floor((element.bounds.x1 + element.bounds.x2) / 2);
         const centerY = Math.floor((element.bounds.y1 + element.bounds.y2) / 2);
-        
+
         // Draw a circle with number
         const radius = 20;
         svgElements.push(`
@@ -68,17 +66,19 @@ export async function overlayNumericTags(
 
     const svg = `
       <svg width="${metadata.width}" height="${metadata.height}">
-        ${svgElements.join('\n')}
+        ${svgElements.join("\n")}
       </svg>
     `;
 
     // Composite the SVG overlay onto the image
     const taggedImageBuffer = await image
-      .composite([{
-        input: Buffer.from(svg),
-        top: 0,
-        left: 0,
-      }])
+      .composite([
+        {
+          input: Buffer.from(svg),
+          top: 0,
+          left: 0,
+        },
+      ])
       .png()
       .toBuffer();
 
@@ -89,7 +89,7 @@ export async function overlayNumericTags(
       mapping,
     };
   } catch (error: any) {
-    logger.error('Failed to overlay numeric tags:', error);
+    logger.error("Failed to overlay numeric tags:", error);
     throw error;
   }
 }
@@ -101,20 +101,20 @@ export async function overlayGridLines(
   base64Image: string,
   gridSize: number,
   logicalWidth: number,
-  logicalHeight: number
-): Promise<{ 
-  image: string; 
+  logicalHeight: number,
+): Promise<{
+  image: string;
   gridMap: Map<string, { x: number; y: number }>;
   scaleFactor: { x: number; y: number };
 }> {
   try {
     const imageBuffer = base64ToBuffer(base64Image);
     const image = sharp(imageBuffer);
-    
+
     // Get actual screenshot dimensions (high-DPI devices have larger screenshots)
     const metadata = await image.metadata();
     if (!metadata.width || !metadata.height) {
-      throw new Error('Failed to get screenshot dimensions');
+      throw new Error("Failed to get screenshot dimensions");
     }
 
     const actualWidth = metadata.width;
@@ -124,7 +124,9 @@ export async function overlayGridLines(
     const scaleFactorX = actualWidth / logicalWidth;
     const scaleFactorY = actualHeight / logicalHeight;
 
-    logger.debug(`Grid overlay: logical=${logicalWidth}x${logicalHeight}, actual=${actualWidth}x${actualHeight}, scale=${scaleFactorX.toFixed(2)}x${scaleFactorY.toFixed(2)}`);
+    logger.debug(
+      `Grid overlay: logical=${logicalWidth}x${logicalHeight}, actual=${actualWidth}x${actualHeight}, scale=${scaleFactorX.toFixed(2)}x${scaleFactorY.toFixed(2)}`,
+    );
 
     const gridMap = new Map<string, { x: number; y: number }>();
     const svgElements: string[] = [];
@@ -175,7 +177,7 @@ export async function overlayGridLines(
           <text x="${Math.floor(col * cellWidth) + Math.floor(10 * scaleFactorX)}" 
                 y="${Math.floor(row * cellHeight) + Math.floor(20 * scaleFactorY)}" 
                 font-size="${fontSize}" font-weight="bold" fill="lime" 
-                stroke="black" stroke-width="${Math.max(1, Math.floor(scaleFactorX))}\"
+                stroke="black" stroke-width="${Math.max(1, Math.floor(scaleFactorX))}"
                 font-family="Arial">${gridLabel}</text>
         `);
       }
@@ -183,21 +185,25 @@ export async function overlayGridLines(
 
     const svg = `
       <svg width="${actualWidth}" height="${actualHeight}">
-        ${svgElements.join('\n')}
+        ${svgElements.join("\n")}
       </svg>
     `;
 
     // Composite the SVG overlay onto the image
     const gridImageBuffer = await image
-      .composite([{
-        input: Buffer.from(svg),
-        top: 0,
-        left: 0,
-      }])
+      .composite([
+        {
+          input: Buffer.from(svg),
+          top: 0,
+          left: 0,
+        },
+      ])
       .png()
       .toBuffer();
 
-    logger.debug(`Created ${gridSize}x${gridSize} grid overlay with ${gridMap.size} cells (coordinates in logical space)`);
+    logger.debug(
+      `Created ${gridSize}x${gridSize} grid overlay with ${gridMap.size} cells (coordinates in logical space)`,
+    );
 
     return {
       image: bufferToBase64(gridImageBuffer),
@@ -205,8 +211,7 @@ export async function overlayGridLines(
       scaleFactor: { x: scaleFactorX, y: scaleFactorY },
     };
   } catch (error: any) {
-    logger.error('Failed to overlay grid lines:', error);
+    logger.error("Failed to overlay grid lines:", error);
     throw error;
   }
 }
-
