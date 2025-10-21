@@ -83,7 +83,30 @@ cd examples
 npx ts-node basic-usage.ios.ts
 ```
 
-#### 2. Demo App Tests
+#### 2. Demo App APK (Android)
+
+If you have the Android native project under `examples/demo-app/android` (gradle wrapper present), you can build the APK via:
+
+```bash
+npm run build:demo:android
+```
+
+The APK is expected at:
+
+```
+examples/demo-app/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Then run the connectivity test against the APK (no LLM required):
+
+```bash
+export MOBILE_APP_PATH="$PWD/examples/demo-app/android/app/build/outputs/apk/debug/app-debug.apk"
+npx ts-node examples/connectivity-android.ts
+```
+
+If the Android project is not present, follow `examples/demo-app/README.md` for setup, or point `MOBILE_APP_PATH` to any existing APK.
+
+#### 3. Demo App Tests
 
 First, set up the demo app (see [demo-app/README.md](./demo-app/README.md)):
 
@@ -105,7 +128,7 @@ cd ../..
 npm test -- examples/tests/demo-app/
 ```
 
-#### 3. Real App Tests
+#### 4. Real App Tests
 
 ```bash
 # Ensure the app is installed on your device/emulator
