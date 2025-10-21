@@ -590,8 +590,8 @@ export class MobileAgent {
       y: targetCoords.y,
     });
 
-    // Wait a bit for UI to settle
-    await this.driver.pause(500);
+    // Wait for UI to settle rather than fixed sleep
+    await this.waitForUiSettle(1200);
   }
 
   /**
@@ -609,8 +609,8 @@ export class MobileAgent {
     logger.debug(`Typing text: ${text}`);
     await this.driver.keys(text.split(""));
 
-    // Wait a bit
-    await this.driver.pause(500);
+    // Wait for keyboard/IME updates to settle
+    await this.waitForUiSettle(1000);
   }
 
   /**
@@ -654,7 +654,7 @@ export class MobileAgent {
       { action: "release" },
     ]);
 
-    await this.driver.pause(500);
+    await this.waitForUiSettle(1000);
   }
 
   /**
@@ -714,7 +714,7 @@ export class MobileAgent {
     await this.driver.touchAction({ action: "tap", x: targetCoords.x, y: targetCoords.y });
     await this.driver.pause(75);
     await this.driver.touchAction({ action: "tap", x: targetCoords.x, y: targetCoords.y });
-    await this.driver.pause(300);
+    await this.waitForUiSettle(800);
   }
 
   /**
@@ -760,7 +760,7 @@ export class MobileAgent {
     ] as any);
 
     await this.driver.releaseActions();
-    await this.driver.pause(300);
+    await this.waitForUiSettle(800);
   }
 
   /**
@@ -806,7 +806,38 @@ export class MobileAgent {
     ] as any);
 
     await this.driver.releaseActions();
-    await this.driver.pause(300);
+    await this.waitForUiSettle(800);
+  }
+
+  /**
+   * Wait until the UI appears stable by sampling page source over time.
+   * This avoids brittle hard sleeps after actions.
+   */
+  private async waitForUiSettle(
+    timeoutMs = 1200,
+    stableIterations = 2,
+    pollMs = 150,
+  ): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    let lastSource: string | undefined;
+    let stable = 0;
+
+    while (Date.now() < deadline) {
+      try {
+        const src = await this.driver.getPageSource();
+        if (lastSource !== undefined && src === lastSource) {
+          stable++;
+          if (stable >= stableIterations) return;
+        } else {
+          stable = 0;
+          lastSource = src;
+        }
+      } catch {
+        // If we can't fetch immediately, just continue polling
+      }
+      await this.driver.pause(pollMs);
+    }
+    // Timeboxed: proceed even if not strictly stabilized
   }
 
   /**
