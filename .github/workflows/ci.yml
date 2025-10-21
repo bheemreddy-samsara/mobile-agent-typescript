@@ -17,4 +17,16 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test --silent
+      - run: npx @biomejs/biome@latest check .
 
+  bun-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.1.34
+      - run: bun install --frozen-lockfile
+      - run: bunx tsc -p tsconfig.json
+      - run: bunx jest --silent
+      - run: bunx @biomejs/biome check .

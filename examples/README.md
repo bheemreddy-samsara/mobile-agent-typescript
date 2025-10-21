@@ -98,7 +98,7 @@ npm run prebuild:android     # generates android/ via Expo
 npm run build:android:apk    # or: bash ../scripts/build-sample-rn-android.sh
 ```
 
-Then run connectivity:
+Then run Android connectivity:
 
 ```bash
 export MOBILE_APP_PATH="$PWD/android/app/build/outputs/apk/debug/app-debug.apk"
@@ -113,6 +113,18 @@ cd examples/sample-rn-app
 npm install
 npm run prebuild:ios
 npm run ios          # opens Xcode/simulator; for Appium, build a Debug .app via Xcode
+
+iOS connectivity and smoke tests (Appium):
+
+```bash
+# Connectivity against a built .app
+export MOBILE_APP_PATH="/absolute/path/to/SampleRNApp.app"
+npx ts-node ../../connectivity-ios.ts
+
+# iOS login smoke (no LLM)
+export MOBILE_APP_PATH="/absolute/path/to/SampleRNApp.app"
+npx ts-node ../../tests/sample-rn-app/ios-login-smoke.ts
+```
 ```
 
 #### 3. Demo App Tests

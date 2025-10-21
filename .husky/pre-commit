@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "Running Biome check..."
+npm run lint || exit 1
+
+echo "Running unit tests..."
+npm test --silent || exit 1
+
