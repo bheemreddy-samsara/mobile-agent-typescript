@@ -378,13 +378,16 @@ See [`examples/README.md`](./examples/README.md) for detailed setup instructions
 ## 🧪 Testing
 
 ```bash
-# Run tests
-npm test
+# With Bun (recommended)
+bun install
+bunx tsc -p tsconfig.json
+bunx jest
+bunx @biomejs/biome check .
 
-# Build the SDK
+# Or with npm
+npm ci
 npm run build
-
-# Lint code
+npm test
 npm run lint
 ```
 
