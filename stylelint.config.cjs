@@ -3,17 +3,16 @@
  */
 module.exports = {
   ignoreFiles: [
-    '**/*.ts',
-    '**/*.tsx',
-    '**/*.js',
-    '**/*.jsx',
-    '**/*.mjs',
-    '**/*.cjs',
-    '**/*.json',
-    '**/*.md',
-    '**/*.mdx',
-    'node_modules/**',
-    'dist/**',
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.js",
+    "**/*.jsx",
+    "**/*.mjs",
+    "**/*.cjs",
+    "**/*.json",
+    "**/*.md",
+    "**/*.mdx",
+    "node_modules/**",
+    "dist/**",
   ],
 };
-
