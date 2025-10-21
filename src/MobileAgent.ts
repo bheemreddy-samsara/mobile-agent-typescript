@@ -448,6 +448,50 @@ export class MobileAgent {
   }
 
   /**
+   * Verify a condition once without mutating the testResult (utility for waits)
+   */
+  private async verifyConditionOneShot(condition: string): Promise<boolean> {
+    try {
+      this.currentState = await this.observer.getUIState(this.driver);
+      const res = await this.llm.verifyCondition(this.currentState, condition, this.actionHistory);
+      return Boolean(res.passed);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Wait until a verification condition passes (verification-as-a-wait).
+   * Falls back to timebox expiry to avoid hangs.
+   */
+  async waitForCondition(condition: string, timeoutMs = 5000, pollMs = 800): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const ok = await this.verifyConditionOneShot(condition);
+      if (ok) return true;
+      await this.driver.pause(pollMs);
+    }
+    return false;
+  }
+
+  /**
+   * Execute an instruction, then block until a verification condition passes
+   * or the timeout elapses. Returns whether the condition passed in time.
+   */
+  async executeAndWait(
+    instruction: string,
+    expectedCondition: string,
+    options: { timeoutMs?: number; pollMs?: number } = {},
+  ): Promise<boolean> {
+    await this.execute(instruction);
+    return await this.waitForCondition(
+      expectedCondition,
+      options.timeoutMs ?? 5000,
+      options.pollMs ?? 800,
+    );
+  }
+
+  /**
    * Stop the testing session
    */
   async stopSession(status: "success" | "failure"): Promise<TestResult> {

@@ -12,6 +12,7 @@
     "test": "jest",
     "lint": "biome check .",
     "format": "biome format --write .",
+    "bench:wait": "TS_NODE_TRANSPILE_ONLY=1 npx ts-node examples/benchmarks/wait-bench.ts",
     "prepublishOnly": "npm run build",
     "mcp-server": "node ./bin/mcp-server.js",
     "prepare": "husky install"
