@@ -125,8 +125,7 @@ export class MobileAgentMCPServer {
     }
 
     // Get configuration from environment variables
-    const platform = process.env.MOBILE_PLATFORM || 'Android';
-    const appPackage = process.env.MOBILE_APP_PACKAGE || 'com.example.app';
+    const platform = (process.env.MOBILE_PLATFORM || 'Android') as 'Android' | 'iOS';
     const apiKey = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
     const llmProvider = process.env.LLM_PROVIDER || 'openai';
 
@@ -134,16 +133,45 @@ export class MobileAgentMCPServer {
       throw new Error('API key not found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable.');
     }
 
+    // Build capabilities from env
+    const caps: any = {
+      platformName: platform,
+      'appium:automationName': process.env.APPIUM_AUTOMATION_NAME || (platform === 'iOS' ? 'XCUITest' : 'UiAutomator2'),
+      'appium:noReset': process.env.APPIUM_NO_RESET === 'true',
+      'appium:newCommandTimeout': parseInt(process.env.APPIUM_NEW_COMMAND_TIMEOUT || '120'),
+    };
+
+    if (platform === 'Android') {
+      if (process.env.MOBILE_APP_PACKAGE) caps['appium:appPackage'] = process.env.MOBILE_APP_PACKAGE;
+      if (process.env.MOBILE_APP_ACTIVITY) caps['appium:appActivity'] = process.env.MOBILE_APP_ACTIVITY;
+      if (process.env.MOBILE_DEVICE_NAME) caps['appium:deviceName'] = process.env.MOBILE_DEVICE_NAME;
+      if (process.env.MOBILE_UDID) caps['appium:udid'] = process.env.MOBILE_UDID;
+    } else {
+      if (process.env.MOBILE_BUNDLE_ID) caps['appium:bundleId'] = process.env.MOBILE_BUNDLE_ID;
+      if (process.env.MOBILE_DEVICE_NAME) caps['appium:deviceName'] = process.env.MOBILE_DEVICE_NAME;
+      if (process.env.MOBILE_UDID) caps['appium:udid'] = process.env.MOBILE_UDID;
+      if (process.env.MOBILE_PLATFORM_VERSION) caps['appium:platformVersion'] = process.env.MOBILE_PLATFORM_VERSION;
+    }
+
+    // App path (optional; can be used for both Android and iOS)
+    if (process.env.MOBILE_APP_PATH) caps['appium:app'] = process.env.MOBILE_APP_PATH;
+
+    // Minimal validation: require either app id (package/bundleId) or app path
+    const hasAppId = platform === 'Android' ? !!caps['appium:appPackage'] : !!caps['appium:bundleId'];
+    const hasAppPath = !!caps['appium:app'];
+    if (!hasAppId && !hasAppPath) {
+      throw new Error(
+        platform === 'Android'
+          ? 'Missing MOBILE_APP_PACKAGE or MOBILE_APP_PATH for Android.'
+          : 'Missing MOBILE_BUNDLE_ID or MOBILE_APP_PATH for iOS.'
+      );
+    }
+
     // Initialize WebDriverIO
     this.driver = await remote({
       hostname: process.env.APPIUM_HOST || 'localhost',
       port: parseInt(process.env.APPIUM_PORT || '4723'),
-      capabilities: {
-        platformName: platform,
-        'appium:automationName': platform === 'iOS' ? 'XCUITest' : 'UiAutomator2',
-        'appium:appPackage': appPackage,
-        'appium:app': process.env.MOBILE_APP_PATH,
-      },
+      capabilities: caps,
     });
 
     // Initialize Mobile Agent
@@ -212,6 +240,8 @@ export class MobileAgentMCPServer {
     // Apply vision mode if specified
     if (args.visionMode === 'pure-vision-only') {
       (this.agent as any).visionConfig.pureVisionOnly = true;
+    } else if (args.visionMode === 'auto') {
+      (this.agent as any).visionConfig.pureVisionOnly = false;
     }
 
     await this.agent.execute(args.instruction);
@@ -400,4 +430,3 @@ if (require.main === module) {
     process.exit(1);
   });
 }
-

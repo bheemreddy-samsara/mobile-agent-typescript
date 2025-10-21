@@ -4,6 +4,42 @@
 
 import { UIState, LLMActionResponse, LLMVerificationResponse, UIElement, VisionMethod } from '../types';
 
+/**
+ * Try to robustly parse JSON from LLM outputs that may contain
+ * markdown code fences or surrounding prose. Returns the first
+ * valid JSON object/array found, or throws on failure.
+ */
+function parseJsonLoose(text: string): any {
+  if (!text) throw new Error('Empty response');
+
+  // Strip markdown code fences if present
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(/^```[a-zA-Z0-9]*\n([\s\S]*?)\n```\s*$/m, '$1');
+
+  // If it's valid JSON as-is
+  try {
+    return JSON.parse(cleaned);
+  } catch {}
+
+  // Attempt to extract the first {...} or [...] block
+  const objMatch = cleaned.match(/\{[\s\S]*\}/);
+  const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+  const candidate = objMatch?.[0] || arrMatch?.[0];
+  if (candidate) {
+    try {
+      return JSON.parse(candidate);
+    } catch {}
+  }
+
+  // Try removing stray backticks and retry
+  const deTicked = cleaned.replace(/`/g, '');
+  try {
+    return JSON.parse(deTicked);
+  } catch {}
+
+  throw new Error(`Failed to parse LLM response as JSON: ${text.substring(0, 200)}...`);
+}
+
 export interface LLMProvider {
   /**
    * Query the LLM with a prompt
@@ -60,9 +96,8 @@ export abstract class BaseLLMProvider implements LLMProvider {
   ): Promise<LLMActionResponse> {
     const prompt = this.buildActionPrompt(uiState, instruction, history);
     const response = await this.query(prompt);
-    
     try {
-      const parsed = JSON.parse(response);
+      const parsed = parseJsonLoose(response);
       return {
         action: parsed.action || 'error',
         elementId: parsed.element_id || parsed.elementId,
@@ -88,9 +123,8 @@ export abstract class BaseLLMProvider implements LLMProvider {
   ): Promise<LLMVerificationResponse> {
     const prompt = this.buildVerificationPrompt(uiState, condition, history);
     const response = await this.query(prompt);
-    
     try {
-      const parsed = JSON.parse(response);
+      const parsed = parseJsonLoose(response);
       return {
         passed: parsed.passed || false,
         assertions: parsed.assertions || [],
@@ -117,9 +151,8 @@ export abstract class BaseLLMProvider implements LLMProvider {
 
     const prompt = this.buildVisionTaggingPrompt(uiState.tagMapping, instruction, history);
     const response = await this.queryWithVision(prompt, uiState.screenshotBase64);
-    
     try {
-      const parsed = JSON.parse(response);
+      const parsed = parseJsonLoose(response);
       const tagId = parsed.tag_id || parsed.tagId;
       const targetElement = uiState.tagMapping.get(tagId);
       
@@ -165,9 +198,8 @@ export abstract class BaseLLMProvider implements LLMProvider {
 
     const prompt = this.buildGridOverlayPrompt(uiState.gridMap, instruction, history);
     const response = await this.queryWithVision(prompt, uiState.screenshotBase64);
-    
     try {
-      const parsed = JSON.parse(response);
+      const parsed = parseJsonLoose(response);
       const gridPosition = parsed.grid_position || parsed.gridPosition;
       const coordinates = uiState.gridMap.get(gridPosition);
       
@@ -202,9 +234,8 @@ export abstract class BaseLLMProvider implements LLMProvider {
   ): Promise<LLMActionResponse> {
     const prompt = this.buildPureVisionPrompt(instruction, screenSize, history);
     const response = await this.queryWithVision(prompt, screenshotBase64);
-    
     try {
-      const parsed = JSON.parse(response);
+      const parsed = parseJsonLoose(response);
       const location = parsed.location || parsed.position;
       
       if (!location || typeof location.x_percent !== 'number' || typeof location.y_percent !== 'number') {
@@ -433,4 +464,3 @@ Examples:
 - Icon in top right corner: {"x_percent": 90, "y_percent": 10}`;
   }
 }
-

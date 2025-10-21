@@ -55,7 +55,7 @@ examples/
 
 ### Running Examples
 
-#### 1. Basic Usage Example
+#### 1. Basic Usage Example (Android)
 
 ```bash
 # Start Appium server
@@ -64,6 +64,23 @@ appium --port 4723
 # In another terminal
 cd examples
 npx ts-node basic-usage.ts
+```
+
+#### 1b. Basic Usage Example (iOS)
+
+```bash
+# Start Appium server
+appium --port 4723
+
+# Boot a simulator (if not already booted)
+xcrun simctl list devices | grep Booted || xcrun simctl boot "iPhone 15"
+
+# In another terminal
+cd examples
+# Optional overrides:
+# export MOBILE_DEVICE_NAME="iPhone 15"
+# export MOBILE_BUNDLE_ID="com.apple.Preferences"
+npx ts-node basic-usage.ios.ts
 ```
 
 #### 2. Demo App Tests
@@ -266,4 +283,3 @@ Feel free to add more examples or test scenarios! See [CONTRIBUTING.md](../CONTR
 ## 📄 License
 
 MIT - See [LICENSE](../LICENSE) for details.
-

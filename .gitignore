@@ -38,3 +38,7 @@ tmp/
 temp/
 *.tmp
 
+# Local artifacts and Appium caches
+artifacts/
+.appium-home/
+.fakehome/

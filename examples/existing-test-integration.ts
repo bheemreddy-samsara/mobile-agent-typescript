@@ -1,3 +1,10 @@
+// Minimal ambient declarations so this example compiles without Mocha types
+// Remove these if you add @types/mocha and run under Mocha
+declare const describe: (name: string, fn: () => void) => void;
+declare const it: (name: string, fn: (this: any) => Promise<void> | void) => void;
+declare const before: (fn: (this: any) => Promise<void> | void) => void;
+declare const after: (fn: (this: any) => Promise<void> | void) => void;
+
 /**
  * Example: Integrating with existing Appium test suites
  * 
@@ -12,7 +19,8 @@ describe('My App Tests with Mobile Agent', () => {
   let driver: WebdriverIO.Browser;
   let agent: MobileAgent;
 
-  before(async function () {
+  // Use classic function with an explicit `this` annotation to satisfy TS
+  before(async function (this: any) {
     this.timeout(60000);
 
     // Your existing WebDriverIO setup
@@ -39,7 +47,7 @@ describe('My App Tests with Mobile Agent', () => {
     await agent.startSession();
   });
 
-  it('should navigate to settings using natural language', async function () {
+  it('should navigate to settings using natural language', async function (this: any) {
     this.timeout(30000);
 
     // Use natural language instead of manual element selectors
@@ -53,7 +61,7 @@ describe('My App Tests with Mobile Agent', () => {
     }
   });
 
-  it('should enable dark mode', async function () {
+  it('should enable dark mode', async function (this: any) {
     this.timeout(30000);
 
     await agent.execute('scroll down to find dark mode toggle');
@@ -61,7 +69,7 @@ describe('My App Tests with Mobile Agent', () => {
     await agent.assert('dark mode is enabled');
   });
 
-  it('can mix manual and AI-driven actions', async function () {
+  it('can mix manual and AI-driven actions', async function (this: any) {
     this.timeout(30000);
 
     // Manual WebDriverIO action
@@ -73,7 +81,7 @@ describe('My App Tests with Mobile Agent', () => {
     await agent.assert('user profile is displayed');
   });
 
-  after(async function () {
+  after(async function (this: any) {
     this.timeout(10000);
 
     // Stop agent session
@@ -116,4 +124,3 @@ async function runStandalone() {
 
 // Uncomment to run standalone
 // runStandalone().catch(console.error);
-
