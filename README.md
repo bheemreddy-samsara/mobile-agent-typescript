@@ -1,34 +1,46 @@
 # Mobile Agent SDK (TypeScript)
 
-> Natural language mobile app testing for Appium/WebDriverIO
-
-A TypeScript SDK that brings natural language testing capabilities to your existing Appium/WebDriverIO test suites. Powered by GPT-4 and Claude, it allows you to write tests using simple English instructions instead of complex element selectors.
+Natural‑language mobile app testing and automation for Appium/WebDriverIO — with a four‑tier hierarchy + vision system and optional MCP server mode for agent clients (Claude Desktop, Cursor, Cline, Goose, etc.).
 
 ## 🌟 Features
 
-- **Natural Language Testing**: Write tests using plain English instructions
-- **Easy Integration**: Works with existing WebDriverIO/Appium tests
-- **Multiple LLM Support**: OpenAI GPT-4 and Anthropic Claude
-- **Type-Safe**: Full TypeScript support with comprehensive type definitions
-- **Four-Tier Hybrid System**: Intelligent fallback from hierarchy → vision tagging → grid overlay → pure vision
-- **Vision Fallback**: Multimodal LLM support when hierarchy fails (with DPI-aware scaling)
-- **MCP Server Support**: Run as Model Context Protocol server for agent-based workflows
-- **Zero Configuration**: Minimal setup required
+- Natural language testing over Appium/WebDriverIO
+- Multi‑LLM support: OpenAI GPT‑4o, Anthropic Claude 3.5
+- Type‑safe SDK with comprehensive TypeScript types
+- Four‑tier vision system: Hierarchy → Vision+Tags → Grid → Pure Vision
+- DPI‑aware scaling and confidence scoring
+- Optional MCP server mode for agent workflows
+- Minimal setup; works with real devices, simulators, emulators
 
 ## 📦 Installation
 
+Choose one path based on your use case.
+
+- Use as a dependency in your project:
+  - `npm install @mobile-agent/sdk`
+
+- Contribute/run from source (this repo):
+  - Bun (recommended because this repo uses `bun.lock`)
+    - `bun install`
+  - Or npm
+    - `npm ci`
+
+Appium setup (required for both):
+
 ```bash
-npm install @mobile-agent/sdk
+npm install -g appium
+appium driver install uiautomator2   # Android
+appium driver install xcuitest       # iOS
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- ✅ Node.js 18+ installed
-- ✅ Appium server running (`appium --port 4723`)
-- ✅ Android device/emulator or iOS simulator
-- ✅ OpenAI or Anthropic API key
+- Node.js 18+ (Bun 1.1+ recommended for this repo)
+- Appium server (`appium --port 4723`)
+- Android emulator/device or iOS simulator/device
+- OpenAI or Anthropic API key
 
 ### 5-Minute Setup
 
@@ -120,7 +132,7 @@ describe('My App Tests', () => {
 
 ## 🤖 Agent Mode (MCP Server)
 
-Run Mobile Agent as an **MCP server** to enable AI agents (Claude, Cursor, Cline) to control mobile devices:
+Run Mobile Agent as an MCP server so agent clients (Claude Desktop, Cursor, Cline, Goose) can control devices:
 
 ```bash
 # Set API key and run
@@ -128,7 +140,7 @@ export OPENAI_API_KEY="sk-..."
 npx @mobile-agent/sdk mobile-agent-mcp
 ```
 
-**Example agent workflow:**
+Example agent workflow:
 ```
 Start a mobile testing session
 Navigate to settings and enable dark mode
@@ -137,14 +149,10 @@ Verify dark mode is enabled
 Stop the session with success
 ```
 
-The agent will use our four-tier vision system to execute commands automatically!
+The agent uses the four‑tier vision system automatically.
 
-**Setup & Configuration:** See **[AGENTS.md](./AGENTS.md)** for complete guide including:
-- Claude Desktop, Cursor, Cline setup
-- 7 available MCP tools
-- Example workflows
-- Comparison with mobile-mcp (2.2k ⭐)
-- Troubleshooting guide
+Setup & client configurations:
+- See `examples/mcp-server/README.md` for Claude Desktop, Cursor, and Cline configs; tool reference; workflows; troubleshooting.
 
 ## 📖 API Reference
 
@@ -291,7 +299,7 @@ The SDK understands various natural language instructions:
 
 ## 🏗️ Architecture
 
-The SDK uses a **three-tier hybrid approach** combining hierarchy and vision:
+The SDK uses a four‑tier hybrid approach combining hierarchy and vision:
 
 ### Tier 1: Hierarchy-Based (Primary)
 
@@ -321,7 +329,7 @@ When hierarchy fails (element not found, low confidence), the system falls back 
 - ✅ **Handles Complex UI** - Works with dynamic layouts
 - ✅ **Visual Context** - Understands visual hierarchy
 
-### Tier 3: Vision + Grid Overlay (Last Resort)
+### Tier 3: Vision + Grid Overlay
 
 For pixel-perfect interactions:
 
@@ -331,9 +339,21 @@ For pixel-perfect interactions:
 4. **Coordinate Calculation**: Converts grid position to exact coordinates
 
 **Benefits:**
-- ✅ **85-90% Accurate** - Precise positioning
-- ✅ **No Element Required** - Works on any screen area
-- ✅ **Custom Gestures** - Complex interactions
+- ✅ 85–90% accuracy — precise positioning
+- ✅ Works without element metadata
+- ✅ Enables complex gestures
+
+### Tier 4: Pure Vision (Last Resort)
+
+When hierarchy, tags, and grid are insufficient:
+
+1. Raw screenshot analysis via vision LLM
+2. LLM returns percentage‑based coordinates
+3. SDK maps to device coordinates and executes the action
+
+**Benefits:**
+- ✅ Maximum compatibility when no metadata is available
+- ⚠️ Lowest confidence of the four tiers (80–85%)
 
 ### Fallback Configuration
 
@@ -348,43 +368,48 @@ const agent = new MobileAgent({
     fallbackOnLowConfidence: true,
     confidenceThreshold: 0.7,
     gridSize: 10,
+    pureVisionOnly: false,
   },
 });
 ```
 
 ## 📊 Examples
 
-See the [`examples/`](./examples) directory for complete examples:
+See the `examples/` directory for complete examples:
 
-### Basic Examples
-- [`basic-usage.ts`](./examples/basic-usage.ts) - Simple getting started example
-- [`existing-test-integration.ts`](./examples/existing-test-integration.ts) - Integration with existing test suites
-- [`multi-provider.ts`](./examples/multi-provider.ts) - Using different LLM providers
+- `examples/basic-usage.ts` — Basic SDK usage
+- `examples/existing-test-integration.ts` — Integrate into existing tests
+- `examples/multi-provider.ts` — Switch between OpenAI and Anthropic
+- `examples/connectivity-android.ts` / `examples/connectivity-ios.ts` — Appium connectivity checks
+- `examples/agent-check-ios.ts` — Quick agent sanity check
 
-### Demo App & Tests
-- [`demo-app/`](./examples/demo-app) - React Native demo app for testing
-- [`tests/demo-app/`](./examples/tests/demo-app) - Comprehensive test suite for demo app
-  - `login-flow.test.ts` - Form validation and login testing
-  - `navigation.test.ts` - Screen navigation testing
-  - `fallback-scenarios.test.ts` - Three-tier fallback system testing
+Sample React Native app and smoke tests:
 
-### Real App Tests
-- [`tests/real-apps/`](./examples/tests/real-apps) - Tests for production apps
-  - `settings.test.ts` - Android/iOS Settings app testing
-  - `google-maps.test.ts` - Complex UI testing with Google Maps
+- `examples/sample-rn-app/` — RN sample app
+- `examples/tests/sample-rn-app/login-smoke.ts` — Android smoke
+- `examples/tests/sample-rn-app/ios-login-smoke.ts` — iOS smoke
 
-See [`examples/README.md`](./examples/README.md) for detailed setup instructions.
+Real app examples:
 
-## 🧪 Testing
+- `examples/tests/real-apps/settings.test.ts`
+- `examples/tests/real-apps/google-maps.test.ts`
+
+See `examples/README.md` and `examples/mcp-server/README.md` for setup details.
+
+## 🧪 Development & Testing
+
+With Bun (recommended in this repo):
 
 ```bash
-# With Bun (recommended)
 bun install
 bunx tsc -p tsconfig.json
 bunx jest
 bunx @biomejs/biome check .
+```
 
-# Or with npm
+Or with npm:
+
+```bash
 npm ci
 npm run build
 npm test
@@ -420,22 +445,14 @@ LLM vs deterministic waits
 - Deterministic hierarchy checks (e.g., `waitForExist`) are usually fastest and cheapest.
 - LLM verification adds network/model latency; use it for complex assertions when hierarchy lacks signal. Recommended pattern: try deterministic oracle first, then fall back to LLM.
 
-## 🔗 Related Projects
+## 🔗 Useful Links
 
-- **[MobileAgentFramework](https://github.com/yourusername/MobileAgentFramework)** - Python version of this SDK
-- **[Appium](https://appium.io/)** - Mobile automation framework
-- **[WebDriverIO](https://webdriver.io/)** - Browser and mobile automation test framework
+- Appium: https://appium.io
+- WebDriverIO: https://webdriver.io
 
-## 📝 Comparison with GPT Driver
+## 📝 Comparison
 
-| Feature | Mobile Agent SDK | GPT Driver |
-|---------|-----------------|------------|
-| Language | TypeScript | TypeScript |
-| LLM Support | OpenAI, Claude | OpenAI |
-| Driver Support | WebDriverIO | WebDriverIO |
-| Platform | Android, iOS | Android, iOS |
-| API Style | Similar | Similar |
-| Open Source | ✅ | ❌ |
+See `docs/APPAGENT_COMPARISON.md` for a comparison with other agent frameworks.
 
 ## 🤝 Contributing
 
@@ -482,17 +499,16 @@ curl http://localhost:4723/status
 
 ## 💬 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/mobile-agent-typescript/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/mobile-agent-typescript/discussions)
-- **Documentation**: [Full Docs](https://mobile-agent.dev)
+- Issues: use GitHub Issues on this repo
+- Discussions: use GitHub Discussions (if enabled)
 
 ## 🎓 Learn More
 
 ### Documentation
-- [Pure Vision Guide](./PURE_VISION_GUIDE.md) - Four-tier system and pure vision mode
-- [Vision Fallback Guide](./VISION_FALLBACK_GUIDE.md) - Technical implementation details
-- [Bug Fixes](./BUG_FIXES.md) - Critical bug fixes and DPI scaling
-- [AppAgent Comparison](./APPAGENT_COMPARISON.md) - Comparison with TencentQQGYLab/AppAgent
+- `docs/VISION_FALLBACK_GUIDE.md` — Four‑tier system
+- `docs/PURE_VISION_GUIDE.md` — Pure vision implementation
+- `docs/BUG_FIXES.md` — Bug fixes and DPI scaling
+- `docs/APPAGENT_COMPARISON.md` — Comparison notes
 
 ### External Resources
 - [Mobile Agent Python SDK](../MobileAgentFramework)
