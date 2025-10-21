@@ -15,7 +15,8 @@
     "bench:wait": "TS_NODE_TRANSPILE_ONLY=1 npx ts-node examples/benchmarks/wait-bench.ts",
     "prepublishOnly": "npm run build",
     "mcp-server": "node ./bin/mcp-server.js",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "bench:android": "TS_NODE_TRANSPILE_ONLY=1 npx ts-node examples/benchmarks/android-settings-bench.ts"
   },
   "keywords": [
     "mobile",
